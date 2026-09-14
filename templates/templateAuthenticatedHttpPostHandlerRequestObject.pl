@@ -14,16 +14,16 @@ main :-
     Limit = {LIMIT},
     findnsols(
         Limit,
-        (PostHandler, Request, Url, AuthFuncName, HeaderKey),
+        (PostHandler, Request, Url, AuthFuncName, AuthEvidence),
         (
-            utils_authenticated_http_post_handler_request_object(PostHandler, Request, Url, AuthFuncName, HeaderKey)
+            utils_authenticated_http_post_handler_request_object(PostHandler, Request, Url, AuthFuncName, AuthEvidence)
         ),
         Matches
     ),
     print_matches(Matches).
 
 print_matches([]) :- !.
-print_matches([(PostHandler, Request, Url, AuthFuncName, HeaderKey)|Tail]) :-
-    format("PostHandler(~q)~nRequest(~q)~nUrl(~q)~nAuthFuncName(~q)~nHeaderKey(~q)~n~n",
-           [PostHandler, Request, Url, AuthFuncName, HeaderKey]),
+print_matches([(PostHandler, Request, Url, AuthFuncName, AuthEvidence)|Tail]) :-
+    format("PostHandler(~q)~nRequest(~q)~nUrl(~q)~nAuthFuncName(~q)~nAuthEvidence(~q)~n~n",
+           [PostHandler, Request, Url, AuthFuncName, AuthEvidence]),
     print_matches(Tail).

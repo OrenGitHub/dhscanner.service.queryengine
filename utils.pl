@@ -93,27 +93,106 @@ utils_http_post_handler_request_object_nextjs(PostHandler, RequestObject, Url) :
 % AuthenticatedHttpPostHandlerRequestObject query — /5 form.
 %
 % Same shape as `utils_http_post_handler_request_object/3`, extended with
-% the two pieces of metadata that identify /how/ the handler is
-% authenticated :
+% two pieces of metadata that identify /how/ the handler is authenticated :
 %
 %   AuthFuncName : the name of the callable that gates PostHandler
 %                  ( bound from the tier-1 authenticator name catalog
 %                  via `utils_authenticating_function/3` ).
 %
-%   HeaderKey    : the string constant passed to `Request.headers.get(...)`
-%                  inside AuthFunc — bound by the composed structural
-%                  predicate `utils_early_return_null_on_missing_request_header_value/2`.
+%   AuthEvidence : a tagged-union term describing /which/ structural
+%                  recognition path bound this match, plus any
+%                  mechanism-specific payload. Constructors currently
+%                  emitted below :
 %
-% Composition rationale : the catalog side (name) and the structural side
-% (early-return-null on missing header) are already independently shipped
-% in this file ; this predicate is where they finally get joined so both
-% pieces of evidence surface in a single kbapi finding.
-utils_authenticated_http_post_handler_request_object(PostHandler, RequestObject, Url, AuthFuncName, HeaderKey) :-
+%      by_header_null_check(HeaderKey)
+%          — the auth function implements the strict
+%            `Request.headers.get( key ) ; if(!v) return null` idiom.
+%            `HeaderKey` is the header name string (e.g. 'x-api-key').
+%
+%      by_all_but_one_bad_return
+%          — the auth function's body shape is "K-1 bad-http returns +
+%            1 parser-injected fall-through" (e.g. formbricks `checkAuth` :
+%            returns `responses.notAuthenticatedResponse()` /
+%            `responses.unauthorizedResponse()` in every failure path and
+%            falls through on success). No payload — the shape /is/ the
+%            evidence, and `AuthFuncName` is already carried separately.
+%
+% Design : one clause per structural mechanism. Adding a new mechanism
+% ( e.g. `by_capability_verifier(VerifierFqn)`, `by_stripe_webhook_sig` )
+% is a pure leaf addition — a new clause here + a matching kbapi
+% `AuthEvidence` constructor + one branch in the queryengine decoder.
+% No existing clause / consumer changes.
+
+utils_authenticated_http_post_handler_request_object(PostHandler, RequestObject, Url, AuthFuncName, by_header_null_check(HeaderKey)) :-
     utils_http_post_handler_request_object(PostHandler, RequestObject, Url),
     kb_called_from(AuthCall, PostHandler),
     utils_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
     utils_early_return_null_on_missing_request_header_value(AuthFunc, HeaderKey).
+
+utils_authenticated_http_post_handler_request_object(PostHandler, RequestObject, Url, AuthFuncName, by_all_but_one_bad_return) :-
+    utils_http_post_handler_request_object(PostHandler, RequestObject, Url),
+    kb_called_from(AuthCall, PostHandler),
+    utils_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
+    utils_authenticating_function_by_return_values(AuthFunc).
 % add more requirements here ...
+
+% -----------------------------------------------------------------------------
+% Unauthenticated + GET-side handler predicates
+%
+% Together with the /5 authenticated POST predicate above, these three
+% clauses form the complete 2x2 grid ( { GET , POST } x { auth , unauth } )
+% that the LLM agent hits as its "first fork" -- see the OWASP-IL 2026
+% talk notes ( docs/OWASP26_NOTES.md ) and the "first move" bridge slide.
+%
+% Design choice ( middle-zone handlers ) : each unauth clause is defined as
+% "handler with NO call to any recognized authenticating function", using
+% negation-as-failure over `utils_authenticating_function/3`. The strict
+% /5 authenticated predicates additionally require
+% `utils_early_return_null_on_missing_request_header_value/2` on the auth
+% function. Handlers whose auth function does NOT satisfy that strict
+% structural gate are therefore classified as *unauthenticated* here (the
+% loose but honest choice -- "no evidence of auth from the KB's
+% perspective"). Do not tighten this without also revisiting the semantics
+% of the "first fork" in the LLM harness -- the current partition is:
+%
+%   authenticated = strong evidence      ( /5 : name gate + header gate )
+%   unauthenticated = no auth call at all ( /3 : negation-as-failure )
+%   middle-zone = counted as unauthenticated ( currently )
+%
+% Symmetric GET/POST intentionally : the OWASP demo compares GET and POST
+% side by side, and any asymmetry in the classification would leak into
+% the demo as noise.
+
+utils_unauthenticated_http_post_handler_request_object(PostHandler, RequestObject, Url) :-
+    utils_http_post_handler_request_object(PostHandler, RequestObject, Url),
+    \+ (
+        kb_called_from(AuthCall, PostHandler),
+        utils_authenticating_function(AuthCall, _, _)
+    ).
+
+% GET twin of the /5 authenticated POST predicate above ; same evidence
+% catalog, mirrored per-mechanism clause structure. See the POST
+% predicate's block comment for the AuthEvidence constructor catalog
+% and the leaf-addition convention.
+
+utils_authenticated_http_get_handler_request_object(GetHandler, RequestObject, Url, AuthFuncName, by_header_null_check(HeaderKey)) :-
+    utils_http_get_handler_request_object(GetHandler, RequestObject, Url),
+    kb_called_from(AuthCall, GetHandler),
+    utils_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
+    utils_early_return_null_on_missing_request_header_value(AuthFunc, HeaderKey).
+
+utils_authenticated_http_get_handler_request_object(GetHandler, RequestObject, Url, AuthFuncName, by_all_but_one_bad_return) :-
+    utils_http_get_handler_request_object(GetHandler, RequestObject, Url),
+    kb_called_from(AuthCall, GetHandler),
+    utils_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
+    utils_authenticating_function_by_return_values(AuthFunc).
+
+utils_unauthenticated_http_get_handler_request_object(GetHandler, RequestObject, Url) :-
+    utils_http_get_handler_request_object(GetHandler, RequestObject, Url),
+    \+ (
+        kb_called_from(AuthCall, GetHandler),
+        utils_authenticating_function(AuthCall, _, _)
+    ).
 
 % /3 form — binds Name and the resolved 1st-party function definition
 % (Func) so callers can chain further structural checks against

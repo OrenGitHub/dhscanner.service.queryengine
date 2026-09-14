@@ -1,6 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module AuthenticatedHttpPostHandlerRequestObjectApi
+-- | Handler for the AuthenticatedHttpGetHandlerRequestObject kbapi query.
+-- GET counterpart of 'AuthenticatedHttpPostHandlerRequestObjectApi' -- same
+-- shape, same decoding pipeline, same auth-metadata surfacing. The two
+-- files are intentionally near-duplicates: they share zero code because
+-- they parse different Prolog output ("GetHandler(...)" vs "PostHandler(...)")
+-- and populate different Content record shapes, but the /structure/ is
+-- identical. When adding a third HTTP verb (e.g. PATCH) mirror this file.
+module AuthenticatedHttpGetHandlerRequestObjectApi
     ( query
     ) where
 
@@ -17,66 +24,59 @@ import Data.List (stripPrefix)
 import Data.List (dropWhileEnd)
 import Control.Monad.IO.Class (liftIO)
 
-query :: Content.AuthenticatedHttpPostHandlerRequestObject -> ApiEnv QueryResult
-query (Content.AuthenticatedHttpPostHandlerRequestObject _ limit) = do
+query :: Content.AuthenticatedHttpGetHandlerRequestObject -> ApiEnv QueryResult
+query (Content.AuthenticatedHttpGetHandlerRequestObject _ limit) = do
     kbFilename <- asksKbFilename
-    liftIO (putStrLn ("[queryengine][api] AuthenticatedHttpPostHandlerRequestObject using kb: " ++ kbFilename))
+    liftIO (putStrLn ("[queryengine][api] AuthenticatedHttpGetHandlerRequestObject using kb: " ++ kbFilename))
     program <- liftIO (instantiateTemplate kbFilename limit)
     path <- liftIO (saveAsMainFile program)
     liftIO (putStrLn ("[queryengine][api] SWI-Prolog main file path: " ++ path))
     outputOrTimeout <- liftIO (runSwiplWithTimeout path)
     let matches = decodeMatches outputOrTimeout
-    pure (FoundAuthenticatedHttpPostHandlerRequestObject Content.FoundAuthenticatedHttpPostHandlerRequestObject
-        { Content.foundAuthenticatedHttpPostHandlerRequestObjectTotal = fromIntegral (length matches)
-        , Content.foundAuthenticatedHttpPostHandlerRequestObjectMatches = matches
+    pure (FoundAuthenticatedHttpGetHandlerRequestObject Content.FoundAuthenticatedHttpGetHandlerRequestObject
+        { Content.foundAuthenticatedHttpGetHandlerRequestObjectTotal = fromIntegral (length matches)
+        , Content.foundAuthenticatedHttpGetHandlerRequestObjectMatches = matches
         })
 
 instantiateTemplate :: FilePath -> Word -> IO T.Text
 instantiateTemplate kbFilename limit = do
-    template <- TIO.readFile "templates/templateAuthenticatedHttpPostHandlerRequestObject.pl"
+    template <- TIO.readFile "templates/templateAuthenticatedHttpGetHandlerRequestObject.pl"
     pure (T.replace "{LIMIT}" (T.pack (show limit))
         (T.replace "{KNOWLEDGE_BASE}" (T.pack kbFilename) template))
 
-decodeMatches :: Maybe (Stdout, a) -> [ Content.FoundAuthenticatedHttpPostHandlerRequestObjectMatch ]
+decodeMatches :: Maybe (Stdout, a) -> [ Content.FoundAuthenticatedHttpGetHandlerRequestObjectMatch ]
 decodeMatches (Just (Stdout out, _)) = mapMaybe decodeMatch (extractMatchBlocks out)
 decodeMatches _ = []
 
 -- | Parses one 5-line block emitted by
--- `templateAuthenticatedHttpPostHandlerRequestObject.pl`:
+-- `templateAuthenticatedHttpGetHandlerRequestObject.pl`:
 --
---     PostHandler(<location-atom>)
+--     GetHandler(<location-atom>)
 --     Request(<location-atom>)
 --     Url(<url-atom-or-string>)
 --     AuthFuncName(<name-atom>)
 --     AuthEvidence(<evidence-compound-term>)
 --
--- The auth-function name and evidence payload come through Prolog's
--- `~q` formatter, so bare atoms are unquoted and atoms with special
--- chars (hyphens, dots) come wrapped in single quotes -- hence the
--- `unquotePrologAtom` step.
---
--- @AuthEvidence(...)@ carries a Prolog compound term whose functor
--- identifies /which/ structural recognition path bound the match and
--- whose ( optional ) argument carries mechanism-specific payload.
--- Constructors accepted here mirror the 'Content.AuthEvidence' Haskell
--- sum ; see 'parseAuthEvidence' below and the kbapi haddock on
--- 'Content.AuthEvidence' for the current catalog.
-decodeMatch :: [String] -> Maybe Content.FoundAuthenticatedHttpPostHandlerRequestObjectMatch
+-- Structural twin of the POST /5 handler ; the only difference is the
+-- leading "GetHandler(...)" tag vs "PostHandler(...)". See that file
+-- for the block-comment on 'parseAuthEvidence' + the leaf-addition
+-- discipline for new 'Content.AuthEvidence' variants.
+decodeMatch :: [String] -> Maybe Content.FoundAuthenticatedHttpGetHandlerRequestObjectMatch
 decodeMatch rawLines = do
     (handlerLine:requestLine:urlLine:authFuncLine:evidenceLine:[]) <- Just (map trim (filter (not . all isSpace) rawLines))
-    handler <- parseTaggedTerm "PostHandler" handlerLine
+    handler <- parseTaggedTerm "GetHandler" handlerLine
     request <- parseTaggedTerm "Request" requestLine
     url <- parseTaggedTerm "Url" urlLine
     authFuncName <- parseTaggedTerm "AuthFuncName" authFuncLine
     evidence <- parseAuthEvidence evidenceLine
     handlerLoc <- restoreloc handler
     loc <- restoreloc request
-    pure Content.FoundAuthenticatedHttpPostHandlerRequestObjectMatch
-        { Content.foundAuthenticatedHttpPostHandlerLocation = handlerLoc
-        , Content.foundAuthenticatedHttpPostHandlerRequestObjectLocation = loc
-        , Content.foundAuthenticatedHttpPostHandlerRequestObjectMatchUrl = unquotePrologAtom url
-        , Content.foundAuthenticatedHttpPostHandlerAuthenticatingFunctionName = unquotePrologAtom authFuncName
-        , Content.foundAuthenticatedHttpPostHandlerAuthEvidence = evidence
+    pure Content.FoundAuthenticatedHttpGetHandlerRequestObjectMatch
+        { Content.foundAuthenticatedHttpGetHandlerLocation = handlerLoc
+        , Content.foundAuthenticatedHttpGetHandlerRequestObjectLocation = loc
+        , Content.foundAuthenticatedHttpGetHandlerRequestObjectMatchUrl = unquotePrologAtom url
+        , Content.foundAuthenticatedHttpGetHandlerAuthenticatingFunctionName = unquotePrologAtom authFuncName
+        , Content.foundAuthenticatedHttpGetHandlerAuthEvidence = evidence
         }
 
 parseTaggedTerm :: String -> String -> Maybe String
@@ -85,15 +85,11 @@ parseTaggedTerm tag line = do
     stripSuffix ")" inner
 
 -- | Decodes one @AuthEvidence(...)@ line into the 'Content.AuthEvidence'
--- sum. The inner term is a Prolog compound whose functor identifies the
--- recognition path :
---
---     by_header_null_check('x-api-key')  -> ByHeaderNullCheck "x-api-key"
---     by_all_but_one_bad_return          -> ByAllButOneBadReturn
---
--- Adding a new evidence variant is a leaf change : a new pattern here
--- + a new @Content.AuthEvidence@ constructor + a matching Prolog
--- clause in utils.pl. No existing branch needs to change.
+-- sum. GET twin of the POST /5 handler's parser -- kept locally
+-- ( zero shared code between the two handlers ) so the two files stay
+-- self-contained and can diverge independently if a verb-specific
+-- evidence variant is ever needed. See the POST /5 handler for the
+-- fuller haddock and constructor catalog.
 parseAuthEvidence :: String -> Maybe Content.AuthEvidence
 parseAuthEvidence line = do
     inner <- parseTaggedTerm "AuthEvidence" line

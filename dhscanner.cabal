@@ -40,6 +40,8 @@ executable queryengine
         -- Each API Query lives in a separate file
         ConstStringsMatchingApi
         HttpGetHandlerRequestObjectApi
+        UnauthenticatedHttpGetHandlerRequestObjectApi
+        AuthenticatedHttpGetHandlerRequestObjectApi
         UnauthenticatedHttpPostHandlerRequestObjectApi
         AuthenticatedHttpPostHandlerRequestObjectApi
 
@@ -50,7 +52,7 @@ executable queryengine
         dhscanner-ast >= 1.1.5,
         dhscanner-bitcode >= 1.0.17,
         dhscanner-kbgen >= 1.2.0,
-        dhscanner-kbapi >= 1.0.5,
+        dhscanner-kbapi >= 1.0.7,
         yesod-core,
         http-types,
         fast-logger,
