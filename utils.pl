@@ -86,8 +86,8 @@ utils_http_get_handler_request_object_nextjs(GetHandler, RequestObject, Url) :-
 utils_http_post_handler_request_object_nextjs(PostHandler, RequestObject, Url) :-
     kb_func_def(PostHandler, 'POST', FileName, Url),
     kb_param_i_of_callable(RequestObject, _, PostHandler),
-    kb_param_has_name(RequestObject, 'req'),
-    kb_param_has_resolved_type(RequestObject, 'next/server.NextRequest'),
+    utils_param_has_request_name(RequestObject),
+    utils_param_has_request_resolved_type(RequestObject),
     endswith(FileName, 'route.ts').
 
 % AuthenticatedHttpPostHandlerRequestObject query — /5 form.
@@ -230,8 +230,13 @@ utils_authenticating_function(Call, Name, Func) :-
 % keeps working.
 utils_authenticating_function(Call) :- utils_authenticating_function(Call, _, _).
 
-utils_authenticating_function_name('authenticateRequest').
-% add more authenticator names here (tier-1 catalog) ...
+% tier-1 NAME catalog removed by design : structural recognition
+% ( `utils_authenticating_function_by_return_values/1` ) is the only
+% evidence path. Do NOT reintroduce hardcoded authenticator names here.
+%
+% `:- dynamic` is intentional : it keeps the predicate defined ( so callers
+% at lines 200-208 fail silently instead of throwing "Unknown procedure" ).
+:- dynamic(utils_authenticating_function_name/1).
 
 % bounded "early-return authenticating function" recognition — no transitive
 % closure by design. two levels only:
@@ -239,8 +244,9 @@ utils_authenticating_function_name('authenticateRequest').
 %            via an early-return-on-param KB fact is a future step)
 %   level-1: a callable that calls a level-0 authenticator ( single hop )
 
-utils_early_return_authenticating_function_name('authenticateRequest').
-% add more authenticator names here ...
+% tier-1 NAME catalog removed by design ; recognition falls back on
+% shape-based evidence only. Do NOT reintroduce hardcoded names here.
+:- dynamic(utils_early_return_authenticating_function_name/1).
 
 utils_early_return_authenticating_function(Callable) :-
     kb_func_def(Callable, Name, _, _),
@@ -711,8 +717,10 @@ utils_capability_verifier_by_name(Callable) :-
     kb_func_def(Callable, Name, _, _),
     utils_capability_verifier_name(Name).
 
-utils_capability_verifier_name('validateLocalSignedUrl').
-% add more capability verifier names here (tier-1 name catalog) ...
+% tier-1 NAME catalog removed by design ; capability-verifier
+% recognition falls back on the shape-based tier only.
+% Do NOT reintroduce hardcoded names here.
+:- dynamic(utils_capability_verifier_name/1).
 
 % -----------------------------------------------------------------------------
 % utils_capability_verifier_by_shape( Callable )
@@ -970,9 +978,15 @@ utils_user_input(UserInput) :- utils_user_input_originated_from_golang_echo_get_
 utils_user_input(UserInput) :- utils_user_input_originated_from_ts_next_request(UserInput).
 % add more web frameworks here ...
 
+utils_param_has_request_name(Param) :- kb_param_has_name(Param, 'req').
+utils_param_has_request_name(Param) :- kb_param_has_name(Param, 'request').
+
+utils_param_has_request_resolved_type(Param) :- kb_param_has_resolved_type(Param, 'next/server.NextRequest').
+utils_param_has_request_resolved_type(Param) :- kb_param_has_resolved_type(Param, 'nodejs.Request').
+
 utils_user_input_originated_from_ts_next_request(Param) :-
-    kb_param_has_name(Param, 'req'),
-    kb_param_has_resolved_type(Param, 'next/server.NextRequest').
+    utils_param_has_request_name(Param),
+    utils_param_has_request_resolved_type(Param).
 
 utils_user_input_originated_from_pip_tornado_get_query_argument(Call) :-
     kb_call_method_of_class(Call, 'get_query_argument', Subclass),
