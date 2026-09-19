@@ -52,7 +52,7 @@ executable queryengine
         dhscanner-ast >= 1.1.5,
         dhscanner-bitcode >= 1.0.17,
         dhscanner-kbgen >= 1.2.0,
-        dhscanner-kbapi >= 1.0.7,
+        dhscanner-kbapi >= 1.0.8,
         yesod-core,
         http-types,
         fast-logger,
