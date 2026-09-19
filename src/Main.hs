@@ -14,9 +14,10 @@
 -- with an empty exposed-modules list, which cabal treats as an
 -- unbuildable library and refuses to solve ). The queryengine has
 -- never used forms or DB persistence -- only routing, TH sugar,
--- logging, all of which live in yesod-core.
+-- logging, all of which live in yesod-core. Yesod.Core re-exports
+-- ToJSON / Value / object / .= from aeson, so no separate aeson
+-- import is needed here.
 import Yesod.Core
-import Data.Aeson ( ToJSON(..), Value, object, (.=) )
 import Kbgen
 import Kbapi ( Query )
 import Api ( queryApi )
