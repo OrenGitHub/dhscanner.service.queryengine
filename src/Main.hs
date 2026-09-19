@@ -8,7 +8,15 @@
 {-# OPTIONS -Wno-unused-matches   #-}
 {-# OPTIONS -Wno-unused-top-binds #-}
 
-import Yesod
+-- Depend on yesod-core directly rather than the `yesod` metapackage :
+-- the metapackage transitively pulls in yesod-persistent and, from
+-- there, the deprecated persistent-template ( now shipped on Hackage
+-- with an empty exposed-modules list, which cabal treats as an
+-- unbuildable library and refuses to solve ). The queryengine has
+-- never used forms or DB persistence -- only routing, TH sugar,
+-- logging, all of which live in yesod-core.
+import Yesod.Core
+import Data.Aeson ( ToJSON(..), Value, object, (.=) )
 import Kbgen
 import Kbapi ( Query )
 import Api ( queryApi )

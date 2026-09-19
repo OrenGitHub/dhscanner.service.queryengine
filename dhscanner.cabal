@@ -65,7 +65,6 @@ executable queryengine
         wai,
         aeson,
         array,
-        yesod,
         text,
         mtl
 
