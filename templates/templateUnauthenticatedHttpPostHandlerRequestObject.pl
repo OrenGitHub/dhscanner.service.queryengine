@@ -5,6 +5,7 @@
 :- dynamic kb_called_from/2.
 :- dynamic kb_call_1st_party_func_defined_in_file/3.
 :- dynamic kb_call_1st_party_func_defined_in_dir/3.
+:- dynamic kb_callable_source_body_length/2.
 
 :- [ '{KNOWLEDGE_BASE}' ].
 :- [ 'utils.pl' ].
