@@ -11,7 +11,6 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends swi-prolog-nox \
  && rm -rf /var/lib/apt/lists/*
 COPY dhscanner.cabal dhscanner.cabal
-COPY cabal.project cabal.project
 RUN cabal update
 RUN cabal build --only-dependencies
 COPY template.pl template.pl
