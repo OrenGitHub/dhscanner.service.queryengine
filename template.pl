@@ -21,7 +21,6 @@
 :- discontiguous kb_callable_annotated_with_user_input_inside_route/2.
 :- discontiguous kb_const_null/1.
 :- discontiguous kb_gated_return/2.
-:- discontiguous utils_arbitrary_file_write/1.
 
 :- dynamic kb_call_1st_party_func_defined_in_dir/3.
 :- dynamic kb_call_1st_party_func_defined_in_file/3.

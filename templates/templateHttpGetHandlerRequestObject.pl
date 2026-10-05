@@ -1,5 +1,5 @@
 :- style_check(-singleton).
-:- discontiguous utils_http_get_handler_request_object/3.
+:- discontiguous endpoints_http_get/3.
 :- [ '{KNOWLEDGE_BASE}' ].
 :- [ 'utils.pl' ].
 :- use_module(library(solution_sequences)).
@@ -10,7 +10,7 @@ main :-
         Limit,
         (GetHandler, Request, Url),
         (
-            utils_http_get_handler_request_object(GetHandler, Request, Url)
+            endpoints_http_get(GetHandler, Request, Url)
         ),
         Matches
     ),

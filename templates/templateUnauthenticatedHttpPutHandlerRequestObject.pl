@@ -1,6 +1,6 @@
 :- style_check(-singleton).
-:- discontiguous utils_http_put_handler_request_object/3.
-:- discontiguous utils_unauthenticated_http_put_handler_request_object/3.
+:- discontiguous endpoints_http_put/3.
+:- discontiguous endpoints_unauthenticated_http_put/3.
 
 :- dynamic kb_called_from/2.
 :- dynamic kb_call_1st_party_func_defined_in_file/3.
@@ -17,7 +17,7 @@ main :-
         Limit,
         (PutHandler, Request, Url),
         (
-            utils_unauthenticated_http_put_handler_request_object(PutHandler, Request, Url)
+            endpoints_unauthenticated_http_put(PutHandler, Request, Url)
         ),
         Matches
     ),

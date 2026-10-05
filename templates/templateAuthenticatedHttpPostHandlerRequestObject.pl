@@ -1,6 +1,6 @@
 :- style_check(-singleton).
-:- discontiguous utils_http_post_handler_request_object/3.
-:- discontiguous utils_authenticated_http_post_handler_request_object/5.
+:- discontiguous endpoints_http_post/3.
+:- discontiguous endpoints_authenticated_http_post/5.
 
 :- dynamic kb_called_from/2.
 :- dynamic kb_call_1st_party_func_defined_in_file/3.
@@ -17,7 +17,7 @@ main :-
         Limit,
         (PostHandler, Request, Url, AuthFuncName, AuthEvidence),
         (
-            utils_authenticated_http_post_handler_request_object(PostHandler, Request, Url, AuthFuncName, AuthEvidence)
+            endpoints_authenticated_http_post(PostHandler, Request, Url, AuthFuncName, AuthEvidence)
         ),
         Matches
     ),
