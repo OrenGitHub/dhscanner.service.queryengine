@@ -7,12 +7,14 @@
 :- [ 'predicates/sinks/open_redirects/python/tornado' ].
 :- [ 'predicates/sinks/db/php/yii' ].
 :- [ 'predicates/sinks/db/golang/gorm' ].
+:- [ 'predicates/sinks/db/nodejs/prisma' ].
 :- [ 'predicates/sinks/rce/golang/native' ].
 :- [ 'predicates/sinks/deser/ruby/native' ].
 
 sinks_cmd_exec(Call) :- sinks_cmd_exec_golang(Call).
 
 sinks_sqli(Call) :- sinks_sqli_php_yii(Call).
+sinks_sqli(Call) :- sinks_sqli_nodejs_prisma(Call).
 
 sinks_ssrf(Call) :- sinks_ssrf_python_requests(Call).
 
@@ -31,3 +33,5 @@ sinks_unsafe_deserialization(Call) :- sinks_unsafe_deserialization_ruby(Call).
 
 sinks_has_prepared_statement_fqn(PreparedStatement) :-
     sinks_has_prepared_statement_fqn_golang_gorm(PreparedStatement).
+sinks_has_prepared_statement_fqn(PreparedStatement) :-
+    sinks_has_prepared_statement_fqn_nodejs_prisma(PreparedStatement).
