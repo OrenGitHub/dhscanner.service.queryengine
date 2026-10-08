@@ -46,6 +46,7 @@ executable queryengine
         AuthenticatedHttpPostHandlerRequestObjectApi
         UnauthenticatedHttpPutHandlerRequestObjectApi
         AuthenticatedHttpPutHandlerRequestObjectApi
+        ControlFlowReachableSqlSinkApi
 
     build-depends:
         base,
