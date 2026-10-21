@@ -4,15 +4,27 @@
 :- [ 'predicates/endpoints/nodejs/nextjs' ].
 :- [ 'predicates/endpoints/nodejs/express' ].
 :- [ 'predicates/endpoints/golang/echo' ].
+:- [ 'predicates/endpoints/java/spring' ].
+
+% Framework recognizers below share one entry point per verb, so a KB
+% from a language without functions ( eg java : methods only ) must
+% still let the other frameworks' clauses run.
+:- dynamic kb_func_def/4.
 
 endpoints_http_get(GetHandler, RequestObject, Url) :-
     endpoints_http_get_nextjs(GetHandler, RequestObject, Url).
+endpoints_http_get(GetHandler, RequestObject, Url) :-
+    endpoints_http_get_spring(GetHandler, RequestObject, Url).
 
 endpoints_http_post(PostHandler, RequestObject, Url) :-
     endpoints_http_post_nextjs(PostHandler, RequestObject, Url).
+endpoints_http_post(PostHandler, RequestObject, Url) :-
+    endpoints_http_post_spring(PostHandler, RequestObject, Url).
 
 endpoints_http_put(PutHandler, RequestObject, Url) :-
     endpoints_http_put_nextjs(PutHandler, RequestObject, Url).
+endpoints_http_put(PutHandler, RequestObject, Url) :-
+    endpoints_http_put_spring(PutHandler, RequestObject, Url).
 
 endpoints_user_input(UserInput) :- endpoints_user_input_tornado(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_nextjs(UserInput).
