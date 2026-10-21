@@ -14,13 +14,13 @@
 % `@RequestMapping( "/api/..." )` url prefix reaches the method-level
 % `@GetMapping( "/x" )` path.
 %
-% Not every KB carries these facts ( non-java KBs, and the java parser
-% does not yet surface class annotations ), so declare them here to
-% keep calls to them failing quietly rather than raising.
+% Not every KB carries these facts ( non-java KBs ), so declare them
+% here to keep calls to them failing quietly rather than raising.
 
 :- dynamic kb_callable_has_annotation/2.
 :- dynamic kb_class_has_annotation/2.
 :- dynamic kb_method_of_class/2.
+:- dynamic kb_keyword_arg_for_call/3.
 
 % -----------------------------------------------------------------------------
 % endpoints_http_get_spring( GetHandler, Mapping, Url )
@@ -57,7 +57,29 @@ endpoints_http_spring(Handler, Verb, Url, Mapping) :-
     endpoints_mapping_verb_spring(Fqn, Verb),
     endpoints_class_prefix_spring(Handler, Prefix),
     endpoints_mapping_path_spring(Mapping, Path),
+    endpoints_join_paths_spring(Prefix, Path, Url).
+
+% -----------------------------------------------------------------------------
+% endpoints_join_paths_spring( Prefix, Path, Url )
+%
+% Spring joins class and method paths with exactly one '/' between them :
+%   "/api/x"  + "content"  --> /api/x/content
+%   "/api/x/" + "**"       --> /api/x/**
+%   "/api/x/" + "/y"       --> /api/x/y
+
+endpoints_join_paths_spring(Prefix, '', Prefix) :- !.
+endpoints_join_paths_spring(Prefix, Path, Url) :-
+    sub_atom(Prefix, _, 1, 0, '/'),
+    sub_atom(Path, 0, 1, _, '/'),
+    !,
+    sub_atom(Path, 1, _, 0, Rest),
+    atom_concat(Prefix, Rest, Url).
+endpoints_join_paths_spring(Prefix, Path, Url) :-
+    ( sub_atom(Prefix, _, 1, 0, '/') ; sub_atom(Path, 0, 1, _, '/') ),
+    !,
     atom_concat(Prefix, Path, Url).
+endpoints_join_paths_spring(Prefix, Path, Url) :-
+    atomic_list_concat([Prefix, '/', Path], Url).
 
 % -----------------------------------------------------------------------------
 % endpoints_effective_annotation_spring( Handler, Annotation, Fqn )
@@ -81,9 +103,9 @@ endpoints_effective_annotation_spring(Handler, Annotation, Fqn) :-
 % The composed `@XxxMapping` annotations fix the verb by name.
 %
 % `@RequestMapping` carries it in `method = RequestMethod.X`, but the
-% KB does not resolve that yet : annotation keyword names are dropped
-% and enum constants have no resolved fqn. Until it does, such
-% handlers are reported with `unresolved` rather than guessed.
+% KB does not resolve that yet : enum constants have no resolved fqn.
+% Until it does, such handlers are reported with `unresolved` rather
+% than guessed.
 
 endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.GetMapping', get).
 endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.PostMapping', post).
@@ -111,20 +133,33 @@ endpoints_class_prefix_spring(_, '').
 %
 % The path a mapping annotation declares :
 %
-%   @GetMapping( "/x" )          --> '/x'
-%   @GetMapping                  --> ''
-%   anything else                --> '{?}'
+%   @GetMapping( "/x" )                   --> '/x'
+%   @GetMapping( value = "/x" )           --> '/x'
+%   @GetMapping( path = "/x" )            --> '/x'
+%   @GetMapping                           --> ''
+%   @GetMapping( produces = "..." )       --> ''
+%   anything else                         --> '{?}'
 %
 % `anything else` covers paths built from constants
-% ( "/api/" + Rest.CATEGORY ) and keyword forms ( value = "/x" ), which
-% the KB cannot attribute to a keyword yet. '{?}' keeps the endpoint
-% visible while flagging the part of the url we could not recover.
+% ( "/api/" + Rest.CATEGORY ). '{?}' keeps the endpoint visible while
+% flagging the part of the url we could not recover.
+%
+% Keyword args keep their positional index too, so the positional
+% clause skips them : `produces = "..."` in slot 0 is not a path.
 
 endpoints_mapping_path_spring(Mapping, Path) :-
-    kb_arg_i_for_call(Arg, 0, Mapping),
+    endpoints_mapping_path_arg_spring(Mapping, Arg),
     kb_const_string(Arg, Path),
     !.
 endpoints_mapping_path_spring(Mapping, '') :-
-    \+ kb_arg_i_for_call(_, _, Mapping),
+    \+ endpoints_mapping_path_arg_spring(Mapping, _),
     !.
 endpoints_mapping_path_spring(_, '{?}').
+
+endpoints_mapping_path_arg_spring(Mapping, Arg) :-
+    kb_keyword_arg_for_call(Arg, value, Mapping).
+endpoints_mapping_path_arg_spring(Mapping, Arg) :-
+    kb_keyword_arg_for_call(Arg, path, Mapping).
+endpoints_mapping_path_arg_spring(Mapping, Arg) :-
+    kb_arg_i_for_call(Arg, 0, Mapping),
+    \+ kb_keyword_arg_for_call(Arg, _, Mapping).
