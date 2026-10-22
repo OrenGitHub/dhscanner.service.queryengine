@@ -55,7 +55,7 @@ executable queryengine
         containers,
         dhscanner-ast >= 1.5.0,
         dhscanner-bitcode >= 2.3.0,
-        dhscanner-kbgen >= 2.1.3,
+        dhscanner-kbgen >= 2.1.4,
         dhscanner-kbapi >= 1.1.4,
         yesod-core,
         http-types,

@@ -157,9 +157,9 @@ endpoints_mapping_path_spring(Mapping, '') :-
 endpoints_mapping_path_spring(_, '{?}').
 
 endpoints_mapping_path_arg_spring(Mapping, Arg) :-
-    kb_keyword_arg_for_call(Arg, value, Mapping).
+    kb_keyword_arg_for_call(value, Arg, Mapping).
 endpoints_mapping_path_arg_spring(Mapping, Arg) :-
-    kb_keyword_arg_for_call(Arg, path, Mapping).
+    kb_keyword_arg_for_call(path, Arg, Mapping).
 endpoints_mapping_path_arg_spring(Mapping, Arg) :-
     kb_arg_i_for_call(Arg, 0, Mapping),
-    \+ kb_keyword_arg_for_call(Arg, _, Mapping).
+    \+ kb_keyword_arg_for_call(_, Arg, Mapping).
