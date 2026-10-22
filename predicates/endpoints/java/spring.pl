@@ -21,6 +21,7 @@
 :- dynamic kb_class_has_annotation/2.
 :- dynamic kb_method_of_class/2.
 :- dynamic kb_keyword_arg_for_call/3.
+:- dynamic kb_param_has_annotation/2.
 
 % -----------------------------------------------------------------------------
 % endpoints_http_get_spring( GetHandler, Mapping, Url )
@@ -163,3 +164,31 @@ endpoints_mapping_path_arg_spring(Mapping, Arg) :-
 endpoints_mapping_path_arg_spring(Mapping, Arg) :-
     kb_arg_i_for_call(Arg, 0, Mapping),
     \+ kb_keyword_arg_for_call(_, Arg, Mapping).
+
+% -----------------------------------------------------------------------------
+% endpoints_user_input_spring( Param )
+%
+% A param of a spring handler that spring binds from the request :
+%
+%   @GetMapping( "/items/{id}" )
+%   public Item item( @PathVariable String id, @RequestParam String q ) { ... }
+%
+% Both `id` and `q` are user input. Like every annotation, the param's
+% annotation is lowered as a call at its own location, so its fqn comes
+% from `kb_call_resolved/2`.
+
+endpoints_user_input_spring(Param) :-
+    kb_param_has_annotation(Param, Annotation),
+    kb_call_resolved(Annotation, Fqn),
+    endpoints_user_input_annotation_spring(Fqn),
+    kb_param_i_of_callable(Param, _, Handler),
+    once(endpoints_http_spring(Handler, _, _, _)).
+
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.RequestParam').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.PathVariable').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.RequestBody').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.RequestHeader').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.CookieValue').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.RequestPart').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.MatrixVariable').
+endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.ModelAttribute').
