@@ -4,3 +4,4 @@
 :- [ 'predicates/auth/api' ].
 :- [ 'predicates/endpoints/api' ].
 :- [ 'predicates/sinks/api' ].
+:- [ 'predicates/sanitizers/api' ].
