@@ -48,6 +48,11 @@ executable queryengine
         AuthenticatedHttpPutHandlerRequestObjectApi
         ControlFlowReachableSqlSinkApi
         ControlFlowReachableFileActionSinkApi
+        ControlFlowReachableOpenRedirectSinkApi
+        HandlerUserInputsApi
+        DataFlowPathApi
+        BranchGuardedCallApi
+        JsonTemplate
 
     build-depends:
         base,
@@ -55,8 +60,8 @@ executable queryengine
         containers,
         dhscanner-ast >= 1.6.0,
         dhscanner-bitcode >= 2.4.0,
-        dhscanner-kbgen >= 2.2.0,
-        dhscanner-kbapi >= 1.1.4,
+        dhscanner-kbgen >= 2.3.0,
+        dhscanner-kbapi >= 1.2.0,
         yesod-core,
         http-types,
         fast-logger,

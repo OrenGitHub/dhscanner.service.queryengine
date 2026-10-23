@@ -166,6 +166,24 @@ utils_control_flow_reaches_sink_fqn_bounded(Source, Fqn, N, Visited) :-
     N_MINUS_1 is N - 1,
     utils_control_flow_reaches_sink_fqn_bounded(Mid, Fqn, N_MINUS_1, [Mid|Visited]).
 
+% ------------------------------------------------------------------
+% utils_control_flow_reaches_call_bounded( Source, CallSite, N, Visited )
+%
+% Same bounded closure as `utils_control_flow_reaches_sink_fqn_bounded/4`,
+% but yields the reached call site itself rather than its fqn, so callers
+% can classify it with a `sinks_*/1` predicate and report its location.
+% ------------------------------------------------------------------
+
+utils_control_flow_reaches_call_bounded(Source, CallSite, _, _) :-
+    kb_called_from(CallSite, Source).
+
+utils_control_flow_reaches_call_bounded(Source, CallSite, N, Visited) :-
+    N >= 1,
+    utils_control_flow_callable_calls_callable(Source, Mid),
+    \+ member(Mid, Visited),
+    N_MINUS_1 is N - 1,
+    utils_control_flow_reaches_call_bounded(Mid, CallSite, N_MINUS_1, [Mid|Visited]).
+
 utils_control_flow_callable_calls_callable(Caller, Callee) :-
     kb_called_from(CallSite, Caller),
     kb_call_1st_party_func_defined_in_file(CallSite, FuncName, FilePath),

@@ -15,6 +15,10 @@ import qualified UnauthenticatedHttpPutHandlerRequestObjectApi
 import qualified AuthenticatedHttpPutHandlerRequestObjectApi
 import qualified ControlFlowReachableSqlSinkApi
 import qualified ControlFlowReachableFileActionSinkApi
+import qualified ControlFlowReachableOpenRedirectSinkApi
+import qualified HandlerUserInputsApi
+import qualified DataFlowPathApi
+import qualified BranchGuardedCallApi
 
 -- | Dispatch a Kbapi 'Query' to its handler module.
 --
@@ -26,8 +30,13 @@ import qualified ControlFlowReachableFileActionSinkApi
 -- see `utils_control_flow_reaches_sink_fqn/2` in `utils.pl` for the
 -- three-edge bounded-closure design they both share.
 --
+-- `ControlFlowReachableOpenRedirectSink`, `HandlerUserInputs`,
+-- `DataFlowPath` and `BranchGuardedCall` take the agent from a handler to
+-- a sink, from its user input to that sink, and from the sink to the
+-- `if` that guards it ( see runner issue #105 ).
+--
 -- The remaining Query constructors (CommentsInFunction,
--- WriteContentToLocalFile, ControlFlowPath, DataFlowPath) still fall
+-- WriteContentToLocalFile, ControlFlowPath) still fall
 -- through to the empty catch-all because their handler modules haven't
 -- been added yet. When adding one, replace the corresponding catch-all
 -- match with an explicit case.
@@ -42,4 +51,8 @@ queryApi (UnauthenticatedHttpPutHandlerRequestObject q) = UnauthenticatedHttpPut
 queryApi (AuthenticatedHttpPutHandlerRequestObject q) = AuthenticatedHttpPutHandlerRequestObjectApi.query q
 queryApi (ControlFlowReachableSqlSink q) = ControlFlowReachableSqlSinkApi.query q
 queryApi (ControlFlowReachableFileActionSink q) = ControlFlowReachableFileActionSinkApi.query q
+queryApi (ControlFlowReachableOpenRedirectSink q) = ControlFlowReachableOpenRedirectSinkApi.query q
+queryApi (HandlerUserInputs q) = HandlerUserInputsApi.query q
+queryApi (DataFlowPath q) = DataFlowPathApi.query q
+queryApi (BranchGuardedCall q) = BranchGuardedCallApi.query q
 queryApi _ = pure (FoundConstStringsMatching Content.FoundConstStringsMatching { Content.foundConstStringsMatchingThisRegex = "", Content.foundConstStringsMatchesTotal = 0, Content.foundConstStringsMatches = [] })
