@@ -22,6 +22,7 @@
 :- dynamic kb_method_of_class/2.
 :- dynamic kb_keyword_arg_for_call/3.
 :- dynamic kb_param_has_annotation/2.
+:- dynamic kb_field_read_resolved/2.
 
 % -----------------------------------------------------------------------------
 % endpoints_http_get_spring( GetHandler, Mapping, Url )
@@ -49,13 +50,13 @@ endpoints_http_put_spring(PutHandler, Mapping, Url) :-
 % `Handler` is a method annotated with a spring-web mapping annotation
 % `Mapping`. `Verb` is one of get / post / put / delete / patch, or
 % `unresolved` for a `@RequestMapping` ( see
-% `endpoints_mapping_verb_spring/2` ). `Url` is the hosting class
+% `endpoints_mapping_verb_spring/3` ). `Url` is the hosting class
 % prefix followed by the method path.
 
 endpoints_http_spring(Handler, Verb, Url, Mapping) :-
     kb_callable_has_annotation(Handler, Mapping),
     kb_call_resolved(Mapping, Fqn),
-    endpoints_mapping_verb_spring(Fqn, Verb),
+    endpoints_mapping_verb_spring(Mapping, Fqn, Verb),
     endpoints_class_prefix_spring(Handler, Prefix),
     endpoints_mapping_path_spring(Mapping, Path),
     endpoints_join_paths_spring(Prefix, Path, Url).
@@ -99,21 +100,47 @@ endpoints_effective_annotation_spring(Handler, Annotation, Fqn) :-
     kb_call_resolved(Annotation, Fqn).
 
 % -----------------------------------------------------------------------------
-% endpoints_mapping_verb_spring( Fqn, Verb )
+% endpoints_mapping_verb_spring( Mapping, Fqn, Verb )
 %
 % The composed `@XxxMapping` annotations fix the verb by name.
 %
-% `@RequestMapping` carries it in `method = RequestMethod.X`, but the
-% KB does not resolve that yet : enum constants have no resolved fqn.
-% Until it does, such handlers are reported with `unresolved` rather
-% than guessed.
+% `@RequestMapping` carries it in `method = RequestMethod.X` : the
+% `RequestMethod.X` field read resolves through `kb_field_read_resolved/2`
+% ( see `endpoints_request_mapping_verb_spring/2` ).
 
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.GetMapping', get).
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.PostMapping', post).
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.PutMapping', put).
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.DeleteMapping', delete).
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.PatchMapping', patch).
-endpoints_mapping_verb_spring('org.springframework.web.bind.annotation.RequestMapping', unresolved).
+endpoints_mapping_verb_spring(_, 'org.springframework.web.bind.annotation.GetMapping', get).
+endpoints_mapping_verb_spring(_, 'org.springframework.web.bind.annotation.PostMapping', post).
+endpoints_mapping_verb_spring(_, 'org.springframework.web.bind.annotation.PutMapping', put).
+endpoints_mapping_verb_spring(_, 'org.springframework.web.bind.annotation.DeleteMapping', delete).
+endpoints_mapping_verb_spring(_, 'org.springframework.web.bind.annotation.PatchMapping', patch).
+endpoints_mapping_verb_spring(Mapping, 'org.springframework.web.bind.annotation.RequestMapping', Verb) :-
+    endpoints_request_mapping_verb_spring(Mapping, Verb).
+
+% -----------------------------------------------------------------------------
+% endpoints_request_mapping_verb_spring( Mapping, Verb )
+%
+%   @RequestMapping( method = RequestMethod.GET )   --> get
+%   @RequestMapping( "/x" )                         --> unresolved
+%
+% A `@RequestMapping` without a resolvable `method = RequestMethod.X`
+% matches every verb in spring. Such handlers are reported with
+% `unresolved` rather than guessed.
+
+endpoints_request_mapping_verb_spring(Mapping, Verb) :-
+    endpoints_request_method_spring(Mapping, Verb).
+endpoints_request_mapping_verb_spring(Mapping, unresolved) :-
+    \+ endpoints_request_method_spring(Mapping, _).
+
+endpoints_request_method_spring(Mapping, Verb) :-
+    kb_keyword_arg_for_call(method, Arg, Mapping),
+    kb_field_read_resolved(Arg, Fqn),
+    endpoints_request_method_verb_spring(Fqn, Verb).
+
+endpoints_request_method_verb_spring('org.springframework.web.bind.annotation.RequestMethod.GET', get).
+endpoints_request_method_verb_spring('org.springframework.web.bind.annotation.RequestMethod.POST', post).
+endpoints_request_method_verb_spring('org.springframework.web.bind.annotation.RequestMethod.PUT', put).
+endpoints_request_method_verb_spring('org.springframework.web.bind.annotation.RequestMethod.DELETE', delete).
+endpoints_request_method_verb_spring('org.springframework.web.bind.annotation.RequestMethod.PATCH', patch).
 
 % -----------------------------------------------------------------------------
 % endpoints_class_prefix_spring( Handler, Prefix )
