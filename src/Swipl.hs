@@ -23,6 +23,7 @@ import System.Directory (getTemporaryDirectory)
 import System.Process ( proc, createProcess, waitForProcess, ProcessHandle, CreateProcess(..), StdStream(..), terminateProcess )
 import System.Exit ( ExitCode(..) )
 import Control.Concurrent ( forkIO, threadDelay, killThread, ThreadId )
+import Control.Concurrent.MVar ( newEmptyMVar, putMVar, takeMVar )
 import Control.Exception ( finally, evaluate )
 import Control.Monad ( join )
 import System.IO ( Handle, openTempFile, hPutStr, hClose, hGetContents, hSetEncoding, utf8 )
@@ -118,14 +119,24 @@ readProcessOutput' :: ExitCode -> String -> String -> Maybe (Stdout, Stderr)
 readProcessOutput' ExitSuccess out err = Just (Stdout out, Stderr err)
 readProcessOutput' _ _ _ = Nothing
 
+-- | drain both pipes /before/ waiting for swipl : an output larger than
+-- the pipe buffer ( ~64KB, eg every handler of a big repo ) otherwise
+-- blocks swipl on its write while we block on its exit, until the
+-- timeout kills it. stderr drains on its own thread so neither pipe
+-- can fill up while the other one is read.
 readProcessOutput :: Handle -> Handle -> ProcessHandle -> IO (Maybe (Stdout, Stderr))
 readProcessOutput hOut hErr ph = do
-    out <- hGetContents hOut
-    err <- hGetContents hErr
+    errVar <- newEmptyMVar
+    _ <- forkIO (drain hErr >>= putMVar errVar)
+    out' <- drain hOut
+    err' <- takeMVar errVar
     exitCode <- waitForProcess ph
-    out' <- evaluate (length out `seq` out)
-    err' <- evaluate (length err `seq` err)
     pure (readProcessOutput' exitCode out' err')
+
+drain :: Handle -> IO String
+drain h = do
+    content <- hGetContents h
+    evaluate (length content `seq` content)
 
 runProcessWithTimeout :: Handle -> Handle -> ProcessHandle -> IO (Maybe (Stdout, Stderr))
 runProcessWithTimeout hOut hErr ph = do
