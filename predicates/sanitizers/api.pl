@@ -3,8 +3,10 @@
 :- [ 'predicates/sanitizers/error_responses/java/servlet' ].
 :- [ 'predicates/sanitizers/error_responses/java/spring' ].
 
-% Not every KB carries these facts ( eg KBs built before kb_gated_call ).
-:- dynamic kb_gated_call/3.
+% Not every KB carries these facts ( eg KBs built before kbgen 2.3.0 ).
+:- dynamic kb_top_level_if_then_else_gadget/4.
+:- dynamic kb_call_guarded_by_cond_in_then_part/3.
+:- dynamic kb_call_guarded_by_cond_in_else_part/3.
 :- dynamic kb_arg_i_for_call/3.
 :- dynamic kb_dataflow_edge/2.
 
@@ -18,23 +20,18 @@ sanitizers_error_call(Call) :- sanitizers_error_call_java_servlet(Call).
 sanitizers_error_call(Call) :- sanitizers_error_call_java_spring(Call).
 
 % -----------------------------------------------------------------------------
-% sanitizers_branch_guard( Call, UserInput, Cond )
+% sanitizers_top_level_if_then_else( Call, Cond, ThenPart, ElsePart )
 %
-% The if-then-else sanitizer gadget : `Cond` is the condition of an `if`
-% that guards `Call` against `UserInput` :
+% `Call` sits in the then or else part of a top level if-then-else :
 %
 %   if ( isAllowed( host( url ) ) ) { response.sendRedirect( url ); }
 %   else { response.sendError( 400, "Invalid redirect url" ); }
-%
-%   1. the condition is a call ( `isAllowed` ),
-%   2. `UserInput` flows into one of its args,
-%   3. one branch holds `Call` ( either branch : polarity is ignored ),
-%   4. the other branch holds an error call.
 
-sanitizers_branch_guard(Call, UserInput, Cond) :-
-    kb_gated_call(Cond, Call, Branch),
-    once(sanitizers_condition_checks_input(Cond, UserInput, _, _, _, _)),
-    once(sanitizers_error_on_other_branch(Cond, Branch, _)).
+sanitizers_top_level_if_then_else(Call, Cond, ThenPart, ElsePart) :-
+    kb_top_level_if_then_else_gadget(_, Cond, ThenPart, ElsePart),
+    (   kb_call_guarded_by_cond_in_then_part(Call, Cond, ThenPart)
+    ;   kb_call_guarded_by_cond_in_else_part(Call, Cond, ElsePart)
+    ).
 
 % -----------------------------------------------------------------------------
 % sanitizers_condition_checks_input( Cond, UserInput, CondCall, CondFqn, ArgIndex, Path )
@@ -63,13 +60,3 @@ sanitizers_flows_into(UserInput, Arg, [UserInput|Rest]) :-
     UserInput \== Arg,
     dataflow_intra_path(UserInput, Arg, Edges),
     findall(Node, member((_, Node), Edges), Rest).
-
-% -----------------------------------------------------------------------------
-% sanitizers_error_on_other_branch( Cond, Branch, ErrorCall )
-%
-% `ErrorCall` is an error call on the branch of `Cond` other than `Branch`.
-
-sanitizers_error_on_other_branch(Cond, Branch, ErrorCall) :-
-    kb_gated_call(Cond, ErrorCall, OtherBranch),
-    OtherBranch \== Branch,
-    sanitizers_error_call(ErrorCall).

@@ -37,59 +37,32 @@ endpoints_user_input(UserInput) :- endpoints_user_input_express(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_echo(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_spring(UserInput).
 
-endpoints_authenticated_http_get(GetHandler, RequestObject, Url, AuthFuncName, by_header_null_check(HeaderKey)) :-
-    endpoints_http_get(GetHandler, RequestObject, Url),
-    kb_called_from(AuthCall, GetHandler),
+% -----------------------------------------------------------------------------
+% endpoints_http( Handler, Verb, RequestObject, Url )
+%
+% Every recognized handler with its verb ( get / post / put / delete /
+% patch ). Handlers whose verb is not known yet ( eg spring
+% `@RequestMapping( method = ... )` ) are left out.
+
+endpoints_http(Handler, get, RequestObject, Url) :- endpoints_http_get(Handler, RequestObject, Url).
+endpoints_http(Handler, post, RequestObject, Url) :- endpoints_http_post(Handler, RequestObject, Url).
+endpoints_http(Handler, put, RequestObject, Url) :- endpoints_http_put(Handler, RequestObject, Url).
+endpoints_http(Handler, delete, Mapping, Url) :- endpoints_http_spring(Handler, delete, Url, Mapping).
+endpoints_http(Handler, patch, Mapping, Url) :- endpoints_http_spring(Handler, patch, Url, Mapping).
+
+% -----------------------------------------------------------------------------
+% endpoints_http_auth( Handler, AuthFuncName, AuthEvidence )
+%
+% `Handler` calls the authenticating function `AuthFuncName`, recognized
+% by `AuthEvidence` : by_header_null_check( HeaderKey ) or
+% by_all_but_one_bad_return.
+
+endpoints_http_auth(Handler, AuthFuncName, by_header_null_check(HeaderKey)) :-
+    kb_called_from(AuthCall, Handler),
     auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
     auth_early_return_null_on_missing_request_header_value(AuthFunc, HeaderKey).
 
-endpoints_authenticated_http_get(GetHandler, RequestObject, Url, AuthFuncName, by_all_but_one_bad_return) :-
-    endpoints_http_get(GetHandler, RequestObject, Url),
-    kb_called_from(AuthCall, GetHandler),
+endpoints_http_auth(Handler, AuthFuncName, by_all_but_one_bad_return) :-
+    kb_called_from(AuthCall, Handler),
     auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
     auth_authenticating_function_by_return_values(AuthFunc).
-
-endpoints_authenticated_http_post(PostHandler, RequestObject, Url, AuthFuncName, by_header_null_check(HeaderKey)) :-
-    endpoints_http_post(PostHandler, RequestObject, Url),
-    kb_called_from(AuthCall, PostHandler),
-    auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
-    auth_early_return_null_on_missing_request_header_value(AuthFunc, HeaderKey).
-
-endpoints_authenticated_http_post(PostHandler, RequestObject, Url, AuthFuncName, by_all_but_one_bad_return) :-
-    endpoints_http_post(PostHandler, RequestObject, Url),
-    kb_called_from(AuthCall, PostHandler),
-    auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
-    auth_authenticating_function_by_return_values(AuthFunc).
-
-endpoints_authenticated_http_put(PutHandler, RequestObject, Url, AuthFuncName, by_header_null_check(HeaderKey)) :-
-    endpoints_http_put(PutHandler, RequestObject, Url),
-    kb_called_from(AuthCall, PutHandler),
-    auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
-    auth_early_return_null_on_missing_request_header_value(AuthFunc, HeaderKey).
-
-endpoints_authenticated_http_put(PutHandler, RequestObject, Url, AuthFuncName, by_all_but_one_bad_return) :-
-    endpoints_http_put(PutHandler, RequestObject, Url),
-    kb_called_from(AuthCall, PutHandler),
-    auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
-    auth_authenticating_function_by_return_values(AuthFunc).
-
-endpoints_unauthenticated_http_get(GetHandler, RequestObject, Url) :-
-    endpoints_http_get(GetHandler, RequestObject, Url),
-    \+ (
-        kb_called_from(AuthCall, GetHandler),
-        auth_authenticating_function(AuthCall, _, _)
-    ).
-
-endpoints_unauthenticated_http_post(PostHandler, RequestObject, Url) :-
-    endpoints_http_post(PostHandler, RequestObject, Url),
-    \+ (
-        kb_called_from(AuthCall, PostHandler),
-        auth_authenticating_function(AuthCall, _, _)
-    ).
-
-endpoints_unauthenticated_http_put(PutHandler, RequestObject, Url) :-
-    endpoints_http_put(PutHandler, RequestObject, Url),
-    \+ (
-        kb_called_from(AuthCall, PutHandler),
-        auth_authenticating_function(AuthCall, _, _)
-    ).

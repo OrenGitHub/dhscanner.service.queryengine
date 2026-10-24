@@ -38,20 +38,11 @@ executable queryengine
         ApiEnv
         Logging
         -- Each API Query lives in a separate file
-        ConstStringsMatchingApi
-        HttpGetHandlerRequestObjectApi
-        UnauthenticatedHttpGetHandlerRequestObjectApi
-        AuthenticatedHttpGetHandlerRequestObjectApi
-        UnauthenticatedHttpPostHandlerRequestObjectApi
-        AuthenticatedHttpPostHandlerRequestObjectApi
-        UnauthenticatedHttpPutHandlerRequestObjectApi
-        AuthenticatedHttpPutHandlerRequestObjectApi
-        ControlFlowReachableSqlSinkApi
-        ControlFlowReachableFileActionSinkApi
-        ControlFlowReachableOpenRedirectSinkApi
-        HandlerUserInputsApi
+        HttpHandlersApi
+        ControlFlowReachableSinksApi
+        ConstStringsApi
         DataFlowPathApi
-        BranchGuardedCallApi
+        SanitizersApi
         JsonTemplate
 
     build-depends:

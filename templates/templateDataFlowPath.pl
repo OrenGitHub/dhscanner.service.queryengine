@@ -5,7 +5,7 @@
 %
 % Shortest intra-procedural path first ( iterative deepening up to
 % {LIMIT_LENGTH} edges ), then a single inter-procedural hop
-% ( `dataflow_inter_path/3` ) as a fallback.
+% ( `dataflow_inter_path/3` ) as an optional fallback.
 %
 % Template slots :
 %
@@ -13,6 +13,7 @@
 %   {FROM_ATOM}        - source location atom ( eg a user-input param )
 %   {TO_ATOM}          - target location atom ( eg a sink call )
 %   {LIMIT_LENGTH}     - max intra-procedural path length, in edges
+%   {ALLOW_INTER_PROCEDURAL} - `true` to fall back to the inter-procedural hop, else `fail`
 %
 % Output : one JSON list of location atoms ( From first, To last ), or
 % `null` when there is no path.
@@ -48,5 +49,6 @@ path(From, To, MaxLength, Edges) :-
     dataflow_bounded_intra_path(From, To, N, [From], Edges),
     !.
 path(From, To, _, Edges) :-
+    {ALLOW_INTER_PROCEDURAL},
     dataflow_inter_path(From, To, Edges),
     !.

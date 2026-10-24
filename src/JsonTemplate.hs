@@ -9,6 +9,8 @@
 module JsonTemplate
     ( runJsonTemplate
     , atomLocation
+    , prologString
+    , prologAtoms
     ) where
 
 import qualified Location
@@ -49,3 +51,15 @@ decodeLine = decodeStrict . TE.encodeUtf8 . T.pack
 
 atomLocation :: String -> Maybe Location.Location
 atomLocation = restoreloc
+
+-- | A Prolog double-quoted string literal.
+prologString :: String -> String
+prologString s = "\"" ++ concatMap escape s ++ "\""
+    where
+        escape '"' = "\\\""
+        escape '\\' = "\\\\"
+        escape c = [ c ]
+
+-- | A Prolog list of quoted atoms.
+prologAtoms :: [ String ] -> String
+prologAtoms atoms = "[" ++ List.intercalate ", " (map (\a -> "'" ++ a ++ "'") atoms) ++ "]"

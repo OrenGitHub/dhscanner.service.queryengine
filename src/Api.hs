@@ -3,56 +3,26 @@ module Api
     ) where
 
 import Kbapi
-import qualified Content
+import qualified WithComments
 import ApiEnv (ApiEnv)
-import qualified ConstStringsMatchingApi
-import qualified HttpGetHandlerRequestObjectApi
-import qualified UnauthenticatedHttpGetHandlerRequestObjectApi
-import qualified AuthenticatedHttpGetHandlerRequestObjectApi
-import qualified UnauthenticatedHttpPostHandlerRequestObjectApi
-import qualified AuthenticatedHttpPostHandlerRequestObjectApi
-import qualified UnauthenticatedHttpPutHandlerRequestObjectApi
-import qualified AuthenticatedHttpPutHandlerRequestObjectApi
-import qualified ControlFlowReachableSqlSinkApi
-import qualified ControlFlowReachableFileActionSinkApi
-import qualified ControlFlowReachableOpenRedirectSinkApi
-import qualified HandlerUserInputsApi
+import qualified HttpHandlersApi
+import qualified ControlFlowReachableSinksApi
+import qualified ConstStringsApi
 import qualified DataFlowPathApi
-import qualified BranchGuardedCallApi
+import qualified SanitizersApi
 
 -- | Dispatch a Kbapi 'Query' to its handler module.
 --
--- The six HTTP-handler queries (auth/unauth x GET/POST/PUT) are the
--- "first fork" surface for the LLM agent -- see docs/OWASP26_NOTES.md
--- and the talk's "first move" bridge slide. `ControlFlowReachableSqlSink`
--- and `ControlFlowReachableFileActionSink` are the second-move "where
--- does this handler land in the DB / file-system layer?" queries --
--- see `utils_control_flow_reaches_sink_fqn/2` in `utils.pl` for the
--- three-edge bounded-closure design they both share.
+-- The agent's path for runner issue #105 : `SelectHttpHandlers` finds
+-- the handlers and their user inputs, `SelectControlFlowReachableSinks`
+-- the sinks a handler reaches, `SelectDataFlowPath` the flow from a user
+-- input to a sink, and `SelectSanitizers` the `if` that guards it.
 --
--- `ControlFlowReachableOpenRedirectSink`, `HandlerUserInputs`,
--- `DataFlowPath` and `BranchGuardedCall` take the agent from a handler to
--- a sink, from its user input to that sink, and from the sink to the
--- `if` that guards it ( see runner issue #105 ).
---
--- The remaining Query constructors (CommentsInFunction,
--- WriteContentToLocalFile, ControlFlowPath) still fall
--- through to the empty catch-all because their handler modules haven't
--- been added yet. When adding one, replace the corresponding catch-all
--- match with an explicit case.
+-- `SelectComments` has no handler yet and answers empty.
 queryApi :: Query -> ApiEnv QueryResult
-queryApi (ConstStringsMatching q) = ConstStringsMatchingApi.query q
-queryApi (HttpGetHandlerRequestObject q) = HttpGetHandlerRequestObjectApi.query q
-queryApi (UnauthenticatedHttpGetHandlerRequestObject q) = UnauthenticatedHttpGetHandlerRequestObjectApi.query q
-queryApi (AuthenticatedHttpGetHandlerRequestObject q) = AuthenticatedHttpGetHandlerRequestObjectApi.query q
-queryApi (UnauthenticatedHttpPostHandlerRequestObject q) = UnauthenticatedHttpPostHandlerRequestObjectApi.query q
-queryApi (AuthenticatedHttpPostHandlerRequestObject q) = AuthenticatedHttpPostHandlerRequestObjectApi.query q
-queryApi (UnauthenticatedHttpPutHandlerRequestObject q) = UnauthenticatedHttpPutHandlerRequestObjectApi.query q
-queryApi (AuthenticatedHttpPutHandlerRequestObject q) = AuthenticatedHttpPutHandlerRequestObjectApi.query q
-queryApi (ControlFlowReachableSqlSink q) = ControlFlowReachableSqlSinkApi.query q
-queryApi (ControlFlowReachableFileActionSink q) = ControlFlowReachableFileActionSinkApi.query q
-queryApi (ControlFlowReachableOpenRedirectSink q) = ControlFlowReachableOpenRedirectSinkApi.query q
-queryApi (HandlerUserInputs q) = HandlerUserInputsApi.query q
-queryApi (DataFlowPath q) = DataFlowPathApi.query q
-queryApi (BranchGuardedCall q) = BranchGuardedCallApi.query q
-queryApi _ = pure (FoundConstStringsMatching Content.FoundConstStringsMatching { Content.foundConstStringsMatchingThisRegex = "", Content.foundConstStringsMatchesTotal = 0, Content.foundConstStringsMatches = [] })
+queryApi (SelectHttpHandlers q) = HttpHandlersApi.query q
+queryApi (SelectControlFlowReachableSinks q) = ControlFlowReachableSinksApi.query q
+queryApi (SelectConstStrings q) = ConstStringsApi.query q
+queryApi (SelectDataFlowPath q) = DataFlowPathApi.query q
+queryApi (SelectSanitizers q) = SanitizersApi.query q
+queryApi (SelectComments _) = pure (FoundCommentsInFunction WithComments.Content { WithComments.total = 0, WithComments.matches = [] })
