@@ -66,6 +66,7 @@ verbAtom Q.Post = "post"
 verbAtom Q.Put = "put"
 verbAtom Q.Delete = "delete"
 verbAtom Q.Patch = "patch"
+verbAtom Q.Unknown = "unknown"
 
 authAtom :: Q.AuthFilter -> String
 authAtom Q.Unauthenticated = "unauthenticated"
@@ -77,6 +78,7 @@ buildVerb "post" = Just Q.Post
 buildVerb "put" = Just Q.Put
 buildVerb "delete" = Just Q.Delete
 buildVerb "patch" = Just Q.Patch
+buildVerb "unknown" = Just Q.Unknown
 buildVerb _ = Nothing
 
 buildHandler :: Handler -> Maybe Q.HttpHandler

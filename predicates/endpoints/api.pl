@@ -43,14 +43,23 @@ endpoints_user_input(UserInput) :- endpoints_user_input_servlet(UserInput).
 % endpoints_http( Handler, Verb, RequestObject, Url )
 %
 % Every recognized handler with its verb ( get / post / put / delete /
-% patch ). Handlers whose verb is not known yet ( eg spring
-% `@RequestMapping( method = ... )` ) are left out.
+% patch ). A handler a request reaches but whose verb is not known
+% ( `endpoints_http_servlet/2` ) comes with verb `unknown`, unless
+% another recognizer already knows its verb.
 
 endpoints_http(Handler, get, RequestObject, Url) :- endpoints_http_get(Handler, RequestObject, Url).
 endpoints_http(Handler, post, RequestObject, Url) :- endpoints_http_post(Handler, RequestObject, Url).
 endpoints_http(Handler, put, RequestObject, Url) :- endpoints_http_put(Handler, RequestObject, Url).
 endpoints_http(Handler, delete, Mapping, Url) :- endpoints_http_spring(Handler, delete, Url, Mapping).
 endpoints_http(Handler, patch, Mapping, Url) :- endpoints_http_spring(Handler, patch, Url, Mapping).
+endpoints_http(Handler, unknown, Request, '{?}') :-
+    endpoints_http_servlet(Handler, Request),
+    \+ endpoints_http_known_verb(Handler).
+
+endpoints_http_known_verb(Handler) :-
+    member(Verb, [get, post, put, delete, patch]),
+    endpoints_http(Handler, Verb, _, _),
+    !.
 
 % -----------------------------------------------------------------------------
 % endpoints_http_auth( Handler, AuthFuncName, AuthEvidence )

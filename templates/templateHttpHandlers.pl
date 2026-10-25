@@ -9,7 +9,7 @@
 % Template slots :
 %
 %   {KNOWLEDGE_BASE}   - path of the kb_XX.pl file to consult
-%   {VERBS}            - list of verbs to keep ( get, post, ... )
+%   {VERBS}            - list of verbs to keep ( get, post, ..., unknown )
 %   {AUTHENTICATIONS}  - list of [ authenticated, unauthenticated ] to keep
 %   {URL_PARTS}        - `none`, or a list of strings the url must contain
 %   {LIMIT}            - max matches to materialize ( `findnsols` cap )
@@ -40,6 +40,8 @@
 :- dynamic kb_const_string/2.
 :- dynamic kb_param_has_name/2.
 :- dynamic kb_param_i_of_callable/3.
+:- dynamic kb_param_has_resolved_type/2.
+:- dynamic kb_dataflow_edge/2.
 
 :- [ '{KNOWLEDGE_BASE}' ].
 :- [ 'utils.pl' ].
@@ -99,7 +101,18 @@ user_inputs(Handler, Mapping, Inputs) :-
     findall(Index-Input, ( kb_param_i_of_callable(Param, Index, Handler), spring_input(Param, Input) ), Pairs),
     keysort(Pairs, Sorted),
     pairs_values(Sorted, Inputs).
+% servlet : the request param's `getParameter( name )` calls, or the
+% request param itself when the handler reads none
+user_inputs(Handler, Request, Inputs) :-
+    endpoints_http_servlet(Handler, Request),
+    !,
+    findall(Input, ( kb_called_from(Call, Handler), servlet_input(Call, Input) ), Found),
+    (   Found == [] -> Inputs = [ _{ kind: 'RequestObject', location: Request, name: null } ] ; Inputs = Found ).
 user_inputs(_, RequestObject, [ _{ kind: 'RequestObject', location: RequestObject, name: null } ]).
+
+servlet_input(Call, _{ kind: 'RequestParam', location: Call, name: Name }) :-
+    endpoints_user_input_servlet(Call),
+    (   kb_arg_i_for_call(Arg, 0, Call), kb_const_string(Arg, Name) -> true ; Name = '' ).
 
 spring_input(Param, _{ kind: Kind, location: Param, name: Name }) :-
     kb_param_has_annotation(Param, Annotation),

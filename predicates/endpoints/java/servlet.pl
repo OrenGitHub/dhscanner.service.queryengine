@@ -4,6 +4,29 @@
 % here to keep calls to them failing quietly rather than raising.
 
 :- dynamic kb_param_has_resolved_type/2.
+:- dynamic kb_callable_source_body_length/2.
+
+% -----------------------------------------------------------------------------
+% endpoints_http_servlet( Handler, Request )
+%
+% `Handler` takes the request as a param named `req` or `request`, typed
+% `HttpServletRequest`, so a request reaches it. Its verb and url live
+% elsewhere ( eg DSpace registers `new OidcLoginFilter( "/api/authn/oidc",
+% HttpMethod.GET.name(), ... )` in WebSecurityConfiguration.java ), so
+% `endpoints_http/4` reports it with verb `unknown` and url '{?}'.
+% Abstract and interface methods ( no body ) are left out.
+
+endpoints_http_servlet(Handler, Request) :-
+    endpoints_request_type_servlet(Type),
+    kb_param_has_resolved_type(Request, Type),
+    kb_param_has_name(Request, Name),
+    endpoints_request_name_servlet(Name),
+    kb_param_i_of_callable(Request, _, Handler),
+    kb_callable_source_body_length(Handler, Length),
+    Length > 0.
+
+endpoints_request_name_servlet(req).
+endpoints_request_name_servlet(request).
 
 % -----------------------------------------------------------------------------
 % endpoints_user_input_servlet( Call )
