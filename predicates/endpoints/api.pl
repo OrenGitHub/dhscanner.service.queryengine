@@ -5,6 +5,7 @@
 :- [ 'predicates/endpoints/nodejs/express' ].
 :- [ 'predicates/endpoints/golang/echo' ].
 :- [ 'predicates/endpoints/java/spring' ].
+:- [ 'predicates/endpoints/java/servlet' ].
 
 % Framework recognizers below share one entry point per verb, so a KB
 % from a language without functions ( eg java : methods only ) must
@@ -36,6 +37,7 @@ endpoints_user_input(UserInput) :- endpoints_user_input_nextjs(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_express(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_echo(UserInput).
 endpoints_user_input(UserInput) :- endpoints_user_input_spring(UserInput).
+endpoints_user_input(UserInput) :- endpoints_user_input_servlet(UserInput).
 
 % -----------------------------------------------------------------------------
 % endpoints_http( Handler, Verb, RequestObject, Url )
