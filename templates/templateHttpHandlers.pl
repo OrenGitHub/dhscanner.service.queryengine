@@ -12,7 +12,9 @@
 %   {VERBS}            - list of verbs to keep ( get, post, ..., unknown )
 %   {AUTHENTICATIONS}  - list of [ authenticated, unauthenticated ] to keep
 %   {URL_PARTS}        - `none`, or a list of strings the url must contain
-%   {LIMIT}            - max matches to materialize ( `findnsols` cap )
+%
+% No cap and no order here : the queryengine orders the matches, then
+% applies `maxNumHttpHandlers` ( runner #112 ).
 %
 % Output : one JSON list of
 %
@@ -53,8 +55,7 @@ main :-
     Verbs = {VERBS},
     Auths = {AUTHENTICATIONS},
     UrlParts = {URL_PARTS},
-    Limit = {LIMIT},
-    findnsols(Limit, Handler, handler(Verbs, Auths, UrlParts, Handler), Handlers),
+    findall(Handler, handler(Verbs, Auths, UrlParts, Handler), Handlers),
     !,
     json_write_dict(current_output, Handlers, [width(0)]),
     nl.

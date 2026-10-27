@@ -14,6 +14,9 @@ import ApiEnv (ApiEnv)
 import JsonTemplate (runJsonTemplate, atomLocation, prologString, prologAtoms)
 import Data.Aeson (FromJSON(..), withObject, (.:), (.:?))
 import Data.Maybe (fromMaybe, mapMaybe)
+import Control.Monad (replicateM)
+import Control.Monad.IO.Class (liftIO)
+import System.Random (randomIO)
 import qualified Data.List as List
 import qualified Data.Set as Set
 
@@ -58,13 +61,24 @@ query features = do
         [ ("{VERBS}", prologAtoms (map verbAtom (Set.toList (Q.verbs features))))
         , ("{AUTHENTICATIONS}", prologAtoms (map authAtom (Set.toList (Q.authentications features))))
         , ("{URL_PARTS}", maybe "none" urlParts (Q.routeContainsUrlParts features))
-        , ("{LIMIT}", show (Q.maxNumHttpHandlers features))
         ]
     let matches = mapMaybe buildHandler (fromMaybe [] reply)
+    ordered <- liftIO (order (Q.orderEndpointsLexicographically features) matches)
     pure (FoundHttpHandlers Q.Content
         { Q.total = fromIntegral (length matches)
-        , Q.matches = matches
+        , Q.matches = take (fromIntegral (Q.maxNumHttpHandlers features)) ordered
         })
+
+-- | runner #112 : ordering happens here, after swipl, so the cap picks
+-- the first handlers of a stable ( lexicographic ) or a random order.
+order :: Bool -> [ Q.HttpHandler ] -> IO [ Q.HttpHandler ]
+order True handlers = pure (List.sortOn lexicographicKey handlers)
+order False handlers = do
+    keys <- replicateM (length handlers) (randomIO :: IO Word)
+    pure (map snd (List.sortOn fst (zip keys handlers)))
+
+lexicographicKey :: Q.HttpHandler -> (String, String, Location)
+lexicographicKey h = (show (Q.httpHandlerVerb h), Q.httpHandlerUrl h, Q.httpHandlerLocation h)
 
 urlParts :: [ String ] -> String
 urlParts parts = "[" ++ List.intercalate ", " (map prologString parts) ++ "]"
