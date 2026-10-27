@@ -19,7 +19,8 @@
 %   { location, verb, url,
 %     def : { kind, name, className },
 %     userInputs : [ { kind, location, name } ],
-%     auth : null | { name, evidence, headerKey } }
+%     auth : null | { name, evidence, headerKey,
+%                     annotations : [ { fqn, location, constStrArgs } ] } }
 % ------------------------------------------------------------------
 
 :- dynamic kb_called_from/2.
@@ -71,14 +72,17 @@ handler(Verbs, Auths, UrlParts, _{ location: Handler, verb: Verb, url: Url, def:
 contains_url_parts(none, _) :- !.
 contains_url_parts(Parts, Url) :- forall(member(Part, Parts), sub_atom(Url, _, _, _, Part)).
 
-auth(Handler, _{ name: Name, evidence: Evidence, headerKey: HeaderKey }) :-
+auth(Handler, Auth) :-
     once(endpoints_http_auth(Handler, Name, AuthEvidence)),
     !,
-    evidence(AuthEvidence, Evidence, HeaderKey).
+    evidence(AuthEvidence, Fields),
+    dict_create(Auth, _, [ name-Name | Fields ]).
 auth(_, null).
 
-evidence(by_header_null_check(HeaderKey), 'ByHeaderNullCheck', HeaderKey).
-evidence(by_all_but_one_bad_return, 'ByAllButOneBadReturn', null).
+evidence(by_header_null_check(HeaderKey), [ evidence-'ByHeaderNullCheck', headerKey-HeaderKey ]).
+evidence(by_all_but_one_bad_return, [ evidence-'ByAllButOneBadReturn' ]).
+evidence(by_annotations(Annotations), [ evidence-'ByAnnotations', annotations-Dicts ]) :-
+    findall(_{ fqn: Fqn, location: Annotation, constStrArgs: Args }, member(sec(Fqn, Annotation, Args), Annotations), Dicts).
 
 auth_kind(null, unauthenticated) :- !.
 auth_kind(_, authenticated).

@@ -66,7 +66,9 @@ endpoints_http_known_verb(Handler) :-
 %
 % `Handler` calls the authenticating function `AuthFuncName`, recognized
 % by `AuthEvidence` : by_header_null_check( HeaderKey ) or
-% by_all_but_one_bad_return.
+% by_all_but_one_bad_return. Or `Handler` carries security annotations,
+% and `AuthFuncName` is the first one's short name : by_annotations(
+% Annotations ), a list of sec( Fqn, Annotation, ConstStrArgs ).
 
 endpoints_http_auth(Handler, AuthFuncName, by_header_null_check(HeaderKey)) :-
     kb_called_from(AuthCall, Handler),
@@ -77,3 +79,6 @@ endpoints_http_auth(Handler, AuthFuncName, by_all_but_one_bad_return) :-
     kb_called_from(AuthCall, Handler),
     auth_authenticating_function(AuthCall, AuthFuncName, AuthFunc),
     auth_authenticating_function_by_return_values(AuthFunc).
+
+endpoints_http_auth(Handler, Name, by_annotations(Annotations)) :-
+    endpoints_http_auth_spring(Handler, Name, Annotations).

@@ -23,7 +23,9 @@ data Def = Def String (Maybe String) (Maybe String)
 
 data Input = Input String String (Maybe String)
 
-data Auth = Auth String String (Maybe String)
+data Auth = Auth String String (Maybe String) (Maybe [ Annotation ])
+
+data Annotation = Annotation String String [ String ]
 
 instance FromJSON Handler where
     parseJSON = withObject "Handler" (\o -> Handler
@@ -41,7 +43,14 @@ instance FromJSON Input where
     parseJSON = withObject "Input" (\o -> Input <$> o .: "kind" <*> o .: "location" <*> o .:? "name")
 
 instance FromJSON Auth where
-    parseJSON = withObject "Auth" (\o -> Auth <$> o .: "name" <*> o .: "evidence" <*> o .:? "headerKey")
+    parseJSON = withObject "Auth" (\o -> Auth
+        <$> o .: "name"
+        <*> o .: "evidence"
+        <*> o .:? "headerKey"
+        <*> o .:? "annotations")
+
+instance FromJSON Annotation where
+    parseJSON = withObject "Annotation" (\o -> Annotation <$> o .: "fqn" <*> o .: "location" <*> o .: "constStrArgs")
 
 query :: Q.Features -> ApiEnv QueryResult
 query features = do
@@ -116,14 +125,24 @@ buildInput' "RequestPart" _ loc = Just (Q.RequestPartCtor (Q.RequestPart loc))
 buildInput' _ _ _ = Nothing
 
 buildAuth :: Auth -> Maybe Q.Authentication
-buildAuth (Auth name evidence headerKey) = do
-    evidence' <- buildEvidence evidence headerKey
+buildAuth (Auth name evidence headerKey annotations) = do
+    evidence' <- buildEvidence evidence headerKey annotations
     pure Q.Authentication
         { Q.authenticationFunctionName = name
         , Q.authenticationEvidence = evidence'
         }
 
-buildEvidence :: String -> Maybe String -> Maybe Q.AuthEvidence
-buildEvidence "ByHeaderNullCheck" (Just headerKey) = Just (Q.ByHeaderNullCheck headerKey)
-buildEvidence "ByAllButOneBadReturn" _ = Just Q.ByAllButOneBadReturn
-buildEvidence _ _ = Nothing
+buildEvidence :: String -> Maybe String -> Maybe [ Annotation ] -> Maybe Q.AuthEvidence
+buildEvidence "ByHeaderNullCheck" (Just headerKey) _ = Just (Q.ByHeaderNullCheck headerKey)
+buildEvidence "ByAllButOneBadReturn" _ _ = Just Q.ByAllButOneBadReturn
+buildEvidence "ByAnnotations" _ (Just annotations) = Q.ByAnnotations <$> traverse buildAnnotation annotations
+buildEvidence _ _ _ = Nothing
+
+buildAnnotation :: Annotation -> Maybe Q.SecurityAnnotation
+buildAnnotation (Annotation fqn atom args) = do
+    loc <- atomLocation atom
+    pure Q.SecurityAnnotation
+        { Q.securityAnnotationFqn = fqn
+        , Q.securityAnnotationLocation = loc
+        , Q.securityAnnotationConstStrArgs = args
+        }

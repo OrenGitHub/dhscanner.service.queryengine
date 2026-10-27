@@ -219,3 +219,72 @@ endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.
 endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.RequestPart').
 endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.MatrixVariable').
 endpoints_user_input_annotation_spring('org.springframework.web.bind.annotation.ModelAttribute').
+
+% -----------------------------------------------------------------------------
+% endpoints_http_auth_spring( Handler, Name, Annotations )
+%
+% `Handler` is guarded by the security annotations `Annotations`, a
+% list of sec( Fqn, Annotation, ConstStrArgs ) :
+%
+%   @PreAuthorize( "hasAuthority('ADMIN')" )   --> [ 'hasAuthority(\'ADMIN\')' ]
+%   @Secured( { "ROLE_A", "ROLE_B" } )         --> [ 'ROLE_A', 'ROLE_B' ]
+%
+% `Name` is the short name of the first one ( 'PreAuthorize' ).
+%
+% Spring checks each group ( `endpoints_security_annotation_spring/2` )
+% on its own : inside a group the method annotation overrides the class
+% one, and every group in effect applies. Annotations that let anyone in
+% ( `permitAll()`, `@PermitAll`, ... ) guard nothing, so a handler with
+% only those stays unauthenticated.
+
+endpoints_http_auth_spring(Handler, Name, Annotations) :-
+    findall(Annotation, endpoints_security_in_effect_spring(Handler, Annotation), Annotations),
+    member(sec(Fqn, _, ConstStrArgs), Annotations),
+    \+ endpoints_open_security_spring(Fqn, ConstStrArgs),
+    !,
+    Annotations = [ sec(First, _, _) | _ ],
+    atomic_list_concat(Parts, '.', First),
+    last(Parts, Name).
+
+endpoints_security_in_effect_spring(Handler, sec(Fqn, Annotation, ConstStrArgs)) :-
+    member(Group, [ preauthorize, secured, jsr250 ]),
+    once(( endpoints_effective_annotation_spring(Handler, Annotation, Fqn),
+           endpoints_security_annotation_spring(Fqn, Group) )),
+    endpoints_const_str_args_spring(Annotation, ConstStrArgs).
+
+endpoints_security_annotation_spring('org.springframework.security.access.prepost.PreAuthorize', preauthorize).
+endpoints_security_annotation_spring('org.springframework.security.access.annotation.Secured', secured).
+endpoints_security_annotation_spring('jakarta.annotation.security.RolesAllowed', jsr250).
+endpoints_security_annotation_spring('jakarta.annotation.security.PermitAll', jsr250).
+endpoints_security_annotation_spring('jakarta.annotation.security.DenyAll', jsr250).
+endpoints_security_annotation_spring('javax.annotation.security.RolesAllowed', jsr250).
+endpoints_security_annotation_spring('javax.annotation.security.PermitAll', jsr250).
+endpoints_security_annotation_spring('javax.annotation.security.DenyAll', jsr250).
+
+% -----------------------------------------------------------------------------
+% endpoints_const_str_args_spring( Annotation, ConstStrArgs )
+%
+% The constant string args of `Annotation`, in order, with array args
+% ( `{ "a", "b" }`, lowered as a `new_array` call ) flattened. Args
+% that are not constant strings are skipped.
+
+endpoints_const_str_args_spring(Annotation, ConstStrArgs) :-
+    findall(Index-Strs, ( kb_arg_i_for_call(Arg, Index, Annotation), endpoints_const_str_arg_spring(Arg, Strs) ), Pairs),
+    keysort(Pairs, Sorted),
+    pairs_values(Sorted, Nested),
+    append(Nested, ConstStrArgs).
+
+endpoints_const_str_arg_spring(Arg, [ Str ]) :-
+    kb_const_string(Arg, Str),
+    !.
+endpoints_const_str_arg_spring(Arg, Strs) :-
+    kb_call_resolved(Arg, '<dhscanner-instrumentation>[new_array]'),
+    findall(Index-Str, ( kb_arg_i_for_call(Elem, Index, Arg), kb_const_string(Elem, Str) ), Pairs),
+    keysort(Pairs, Sorted),
+    pairs_values(Sorted, Strs).
+
+endpoints_open_security_spring('jakarta.annotation.security.PermitAll', _).
+endpoints_open_security_spring('javax.annotation.security.PermitAll', _).
+endpoints_open_security_spring(_, [ Expression ]) :-
+    split_string(Expression, "", " \t", [ Trimmed ]),
+    memberchk(Trimmed, [ "permitAll()", "permitAll", "isAnonymous()", "IS_AUTHENTICATED_ANONYMOUSLY" ]).
