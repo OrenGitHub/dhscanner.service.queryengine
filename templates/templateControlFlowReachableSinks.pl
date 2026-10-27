@@ -24,6 +24,8 @@
 :- dynamic kb_call_resolved/2.
 :- dynamic kb_func_def/4.
 :- dynamic kb_class_def/3.
+:- dynamic kb_method_of_class/2.
+:- dynamic kb_method_has_name/2.
 :- dynamic kb_call_method_of_class/3.
 :- dynamic kb_class_has_1st_party_super/3.
 :- dynamic kb_class_has_3rd_party_super/3.

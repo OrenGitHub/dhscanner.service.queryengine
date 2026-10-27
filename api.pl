@@ -5,3 +5,4 @@
 :- [ 'predicates/endpoints/api' ].
 :- [ 'predicates/sinks/api' ].
 :- [ 'predicates/sanitizers/api' ].
+:- [ 'predicates/callgraph/api' ].

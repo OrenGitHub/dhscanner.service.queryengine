@@ -2,15 +2,18 @@
 
 :- [ 'predicates/sinks/files/nodejs/native' ].
 :- [ 'predicates/sinks/files/golang/native' ].
+:- [ 'predicates/sinks/files/java/native' ].
 :- [ 'predicates/sinks/ssrf/python/requests' ].
 :- [ 'predicates/sinks/ssrf/golang/native' ].
 :- [ 'predicates/sinks/ssrf/nodejs/native' ].
+:- [ 'predicates/sinks/ssrf/java/native' ].
 :- [ 'predicates/sinks/open_redirects/python/tornado' ].
 :- [ 'predicates/sinks/open_redirects/nodejs/native' ].
 :- [ 'predicates/sinks/open_redirects/java/servlet' ].
 :- [ 'predicates/sinks/db/php/yii' ].
 :- [ 'predicates/sinks/db/golang/gorm' ].
 :- [ 'predicates/sinks/db/nodejs/prisma' ].
+:- [ 'predicates/sinks/db/java/jpa' ].
 :- [ 'predicates/sinks/rce/golang/native' ].
 :- [ 'predicates/sinks/deser/ruby/native' ].
 
@@ -18,18 +21,23 @@ sinks_cmd_exec(Call) :- sinks_cmd_exec_golang(Call).
 
 sinks_sqli(Call) :- sinks_sqli_php_yii(Call).
 sinks_sqli(Call) :- sinks_sqli_nodejs_prisma(Call).
+sinks_sqli(Call) :- sinks_sqli_java_jpa(Call).
 
 sinks_ssrf(Call) :- sinks_ssrf_python_requests(Call).
 sinks_ssrf(Call) :- sinks_ssrf_nodejs_fetch(Call).
+sinks_ssrf(Call) :- sinks_ssrf_java(Call).
 
 sinks_http_request(Call) :- sinks_http_request_golang(Call).
 
 sinks_arbitrary_file_read(Call) :- sinks_arbitrary_file_read_nodejs(Call).
 sinks_arbitrary_file_read(Call) :- sinks_arbitrary_file_read_express_sendFile(Call).
+sinks_arbitrary_file_read(Call) :- sinks_arbitrary_file_read_java(Call).
 
 sinks_arbitrary_file_write(Arg) :- sinks_arbitrary_file_write_nodejs(Arg).
+sinks_arbitrary_file_write(Arg) :- sinks_arbitrary_file_write_java(Arg).
 
 sinks_arbitrary_file_deletion(Call) :- sinks_arbitrary_file_deletion_golang(Call).
+sinks_arbitrary_file_deletion(Call) :- sinks_arbitrary_file_deletion_java(Call).
 
 sinks_open_redirect(Call) :- sinks_open_redirect_python_tornado(Call).
 sinks_open_redirect(Call) :- sinks_open_redirect_nodejs_response_redirect(Call).

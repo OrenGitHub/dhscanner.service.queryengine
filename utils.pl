@@ -172,17 +172,30 @@ utils_control_flow_reaches_sink_fqn_bounded(Source, Fqn, N, Visited) :-
 % Same bounded closure as `utils_control_flow_reaches_sink_fqn_bounded/4`,
 % but yields the reached call site itself rather than its fqn, so callers
 % can classify it with a `sinks_*/1` predicate and report its location.
+%
+% Breadth first over callables with a seen set : the call sites within N
+% hops are the same as with path enumeration, but java virtual dispatch
+% makes the callable graph dense enough for path enumeration to blow up
+% ( runner #119 ). `Visited` is kept for the template's call shape.
 % ------------------------------------------------------------------
 
-utils_control_flow_reaches_call_bounded(Source, CallSite, _, _) :-
-    kb_called_from(CallSite, Source).
+utils_control_flow_reaches_call_bounded(Source, CallSite, N, _) :-
+    utils_control_flow_callables_within(Source, N, Callables),
+    member(Callable, Callables),
+    kb_called_from(CallSite, Callable).
 
-utils_control_flow_reaches_call_bounded(Source, CallSite, N, Visited) :-
-    N >= 1,
-    utils_control_flow_callable_calls_callable(Source, Mid),
-    \+ member(Mid, Visited),
+utils_control_flow_callables_within(Source, N, Callables) :-
+    utils_control_flow_bfs([Source], [Source], N, Callables).
+
+utils_control_flow_bfs([], Seen, _, Seen) :- !.
+utils_control_flow_bfs(_, Seen, 0, Seen) :- !.
+utils_control_flow_bfs(Frontier, Seen, N, Callables) :-
+    findall(Callee, ( member(Caller, Frontier), utils_control_flow_callable_calls_callable(Caller, Callee) ), Callees),
+    sort(Callees, Sorted),
+    ord_subtract(Sorted, Seen, New),
+    ord_union(Seen, New, Seen1),
     N_MINUS_1 is N - 1,
-    utils_control_flow_reaches_call_bounded(Mid, CallSite, N_MINUS_1, [Mid|Visited]).
+    utils_control_flow_bfs(New, Seen1, N_MINUS_1, Callables).
 
 utils_control_flow_callable_calls_callable(Caller, Callee) :-
     kb_called_from(CallSite, Caller),
@@ -196,5 +209,8 @@ utils_control_flow_callable_calls_callable(Caller, Callee) :-
 
 utils_control_flow_callable_calls_callable(Wrapper, Handler) :-
     endpoints_hoc_dict_handler_unwrap_nextjs(Wrapper, Handler).
+
+utils_control_flow_callable_calls_callable(Caller, Callee) :-
+    callgraph_callable_calls_callable(Caller, Callee).
 
 :- [ 'api' ].
