@@ -1,6 +1,7 @@
 :- style_check(-singleton).
 
 :- [ 'predicates/endpoints/python/tornado' ].
+:- [ 'predicates/endpoints/python/django' ].
 :- [ 'predicates/endpoints/nodejs/nextjs' ].
 :- [ 'predicates/endpoints/nodejs/express' ].
 :- [ 'predicates/endpoints/golang/echo' ].
@@ -52,6 +53,7 @@ endpoints_http(Handler, post, RequestObject, Url) :- endpoints_http_post(Handler
 endpoints_http(Handler, put, RequestObject, Url) :- endpoints_http_put(Handler, RequestObject, Url).
 endpoints_http(Handler, delete, Mapping, Url) :- endpoints_http_spring(Handler, delete, Url, Mapping).
 endpoints_http(Handler, patch, Mapping, Url) :- endpoints_http_spring(Handler, patch, Url, Mapping).
+endpoints_http(Handler, Verb, Request, Url) :- endpoints_http_django(Handler, Verb, Request, Url).
 endpoints_http(Handler, unknown, Request, '{?}') :-
     endpoints_http_servlet(Handler, Request),
     \+ endpoints_http_known_verb(Handler).
