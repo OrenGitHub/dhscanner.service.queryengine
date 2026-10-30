@@ -32,7 +32,7 @@
 % `error` query-parameter on the second site ), so BOTH fit the
 % Open-Redirect sink shape structurally. We do NOT taint-check the
 % URL argument here -- same convention as `sinks_ssrf_nodejs_fetch/1`
-% and `sinks_ssrf_python_requests/1` ; taint-checking is downstream
+% and `sinks_ssrf_python/1` ; taint-checking is downstream
 % work in `open_redirect/1` ( `utils.pl` ) which composes the sink
 % with `dataflow_inter_path/3`.
 

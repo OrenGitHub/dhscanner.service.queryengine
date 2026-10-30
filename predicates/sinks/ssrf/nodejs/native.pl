@@ -20,7 +20,7 @@
 % calls `fetch("https://slack.com/api/oauth.v2.access", {...})` --
 % a hardcoded-URL outbound HTTP call that fits the SSRF SINK shape
 % structurally (we do NOT taint-check the URL argument here, same
-% way `sinks_ssrf_python_requests/1` matches every `requests.post`
+% way `sinks_ssrf_python/1` matches every `requests.post`
 % call regardless of URL argument).
 
 sinks_ssrf_nodejs_fetch(Call) :-
