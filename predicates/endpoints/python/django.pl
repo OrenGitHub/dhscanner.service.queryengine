@@ -25,6 +25,8 @@
 % here to keep calls to them failing quietly rather than raising.
 
 :- dynamic kb_call_resolved/2.
+:- dynamic kb_call_method_of_class/3.
+:- dynamic kb_call_1st_party_func_defined_in_file/3.
 :- dynamic kb_arg_i_for_call/3.
 :- dynamic kb_const_string/2.
 :- dynamic kb_field_read_resolved/2.
@@ -74,11 +76,24 @@ endpoints_route_django(Url, View) :-
 endpoints_route_fqn_django('django.urls.path').
 endpoints_route_fqn_django('django.urls.re_path').
 
+% The python front rewrites `weblate.trans.views.about.StatsView.as_view()`
+% into `<alias>_Subclass.as_view()`, with `class <alias>_Subclass(<alias>)`
+% and `<alias>` imported from `weblate/trans/views/about.py` ( runner #131 ) :
+% a method call on a class of this file, whose 1st party super is `StatsView`.
+% `python_method_resolved/3` climbs from the subclass to the verb methods.
+endpoints_view_class_django(View, Class) :-
+    kb_call_method_of_class(View, as_view, Class).
 endpoints_view_class_django(View, Class) :-
     kb_call_resolved(View, Fqn),
     atom_concat(ClassFqn, '.as_view', Fqn),
     python_class_by_fqn(ClassFqn, Class).
 
+% The python front calls a 1st party function passed as an argument :
+% `path("hosting/", weblate.accounts.views.hosting)` -> `<alias>()`, with
+% `<alias>` imported from `weblate/accounts/views.py` ( runner #131 ).
+endpoints_view_func_django(View, Func) :-
+    kb_call_1st_party_func_defined_in_file(View, Name, File),
+    kb_func_def(Func, Name, File, _).
 endpoints_view_func_django(View, Func) :-
     kb_field_read_resolved(View, Fqn),
     python_func_by_fqn(Fqn, Func).
