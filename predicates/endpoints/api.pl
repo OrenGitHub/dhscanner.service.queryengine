@@ -7,6 +7,7 @@
 :- [ 'predicates/endpoints/golang/echo' ].
 :- [ 'predicates/endpoints/java/spring' ].
 :- [ 'predicates/endpoints/java/servlet' ].
+:- [ 'predicates/endpoints/ruby/rails' ].
 
 % Framework recognizers below share one entry point per verb, so a KB
 % from a language without functions ( eg java : methods only ) must
@@ -54,6 +55,7 @@ endpoints_http(Handler, put, RequestObject, Url) :- endpoints_http_put(Handler, 
 endpoints_http(Handler, delete, Mapping, Url) :- endpoints_http_spring(Handler, delete, Url, Mapping).
 endpoints_http(Handler, patch, Mapping, Url) :- endpoints_http_spring(Handler, patch, Url, Mapping).
 endpoints_http(Handler, Verb, Request, Url) :- endpoints_http_django(Handler, Verb, Request, Url).
+endpoints_http(Handler, Verb, Request, Url) :- endpoints_http_rails(Handler, Verb, Request, Url).
 endpoints_http(Handler, unknown, Request, '{?}') :-
     endpoints_http_servlet(Handler, Request),
     \+ endpoints_http_known_verb(Handler).
