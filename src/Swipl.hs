@@ -1,20 +1,14 @@
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
 module Swipl
-    ( QueryEngineResult(..)
-    , Stdout(..)
+    ( Stdout(..)
     , Stderr(..)
-    , queryEngine
     , writeFactsToTempFile
     , runSwiplWithTimeout
     , saveAsMainFile
     ) where
 
 import Kbgen
-import GHC.Generics
-import Data.Aeson (ToJSON)
 import Data.List as List
 import System.Timeout (timeout)
 import qualified Data.Text as T
@@ -32,21 +26,6 @@ import qualified System.IO as IO
 newtype Stdout = Stdout String deriving ( Show, Eq )
 newtype Stderr = Stderr String deriving ( Show, Eq )
 
-data QueryEngineResult
-   = QueryEngineResult
-     {
-         stdout :: String,
-         stderr :: String
-     }
-     deriving (Show, Generic, ToJSON)
-
-queryEngine :: [ Kbgen.Fact ] -> IO QueryEngineResult
-queryEngine facts = do
-    kb_filename <- writeFactsToTempFile facts
-    main_filename <- instantiateTemplate kb_filename
-    resultsOrTimeout <- runSwiplWithTimeout main_filename
-    pure (jsonify resultsOrTimeout)
-
 writeFactsToTempFile :: [ Kbgen.Fact ] -> IO FilePath
 writeFactsToTempFile facts = do
     tmpDir <- getTemporaryDirectory
@@ -59,18 +38,6 @@ writeFactsToFileHandle facts filename handle = do
     hPutStr handle (List.unlines (List.sort (List.map prologify facts)))
     hClose handle
     pure filename
-
-instantiateTemplate :: FilePath -> IO FilePath
-instantiateTemplate kb_filename = do
-    template <- readTemplate "template.pl"
-    adjusted <- adjustTemplate kb_filename template
-    saveAsMainFile adjusted
-
-readTemplate :: FilePath -> IO T.Text
-readTemplate = TIO.readFile
-
-adjustTemplate :: FilePath -> T.Text -> IO T.Text
-adjustTemplate kb_filename template = pure (T.replace "{KNOWLEDGE_BASE}" (T.pack kb_filename) template)
 
 saveAsMainFile :: T.Text -> IO FilePath
 saveAsMainFile content = do
@@ -151,7 +118,3 @@ runSwiplWithTimeout' _ = pure Nothing
 
 runSwiplWithTimeout :: FilePath -> IO (Maybe (Stdout, Stderr))
 runSwiplWithTimeout path = createSwiplProcess path >>= runSwiplWithTimeout'
-
-jsonify :: Maybe (Stdout, Stderr) -> QueryEngineResult
-jsonify (Just (Stdout o, Stderr e)) = QueryEngineResult { stdout = o, stderr = e }
-jsonify Nothing = QueryEngineResult { stdout = "", stderr = "timeout: " ++ (show swiplTimeLimitSeconds) }

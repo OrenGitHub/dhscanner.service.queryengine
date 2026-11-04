@@ -47,7 +47,7 @@
 :- dynamic kb_dataflow_edge/2.
 
 :- [ '{KNOWLEDGE_BASE}' ].
-:- [ 'utils.pl' ].
+:- [ 'predicates/api' ].
 :- use_module(library(solution_sequences)).
 :- use_module(library(http/json)).
 

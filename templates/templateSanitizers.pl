@@ -35,7 +35,7 @@
 :- dynamic kb_const_string/2.
 
 :- [ '{KNOWLEDGE_BASE}' ].
-:- [ 'utils.pl' ].
+:- [ 'predicates/api' ].
 :- use_module(library(solution_sequences)).
 :- use_module(library(http/json)).
 

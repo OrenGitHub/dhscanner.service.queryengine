@@ -34,7 +34,7 @@
 :- dynamic kb_const_string/2.
 
 :- [ '{KNOWLEDGE_BASE}' ].
-:- [ 'utils.pl' ].
+:- [ 'predicates/api' ].
 :- use_module(library(solution_sequences)).
 :- use_module(library(http/json)).
 
@@ -47,7 +47,7 @@ main :-
         Limit,
         _{ location: Call, qualifiedName: Fqn, kind: Kind },
         distinct(Call-Kind, (
-            utils_control_flow_reaches_call_bounded(Source, Call, NumHops, [Source]),
+            callgraph_reaches_call_bounded(Source, Call, NumHops),
             kb_call_resolved(Call, Fqn),
             member(Kind, Kinds),
             sink_kind(Call, Fqn, Kind)

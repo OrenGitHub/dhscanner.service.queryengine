@@ -25,10 +25,7 @@ import ApiEnv ( ApiConfig(..), runApiEnv )
 import Logging
 import Swipl
 import GHC.Generics
-import Data.List as List
 import qualified Data.Text as T
-import qualified Network.Wai
-import qualified Network.HTTP.Types.Status as NetworkHTTPTypes
 import Network.Wai.Handler.Warp (run)
 import Data.Word ( Word64 )
 
@@ -39,7 +36,6 @@ instance ToJSON Healthy where toJSON (Healthy status) = object [ "healthy" .= st
 data App = App
 
 mkYesod "App" [parseRoutes|
-/querycheck QuerycheckR POST
 /uploadkb UploadkbR POST
 /api ApiR POST
 /healthcheck HealthcheckR GET
@@ -55,7 +51,6 @@ useIncreasedSizeLimit :: Word64
 useIncreasedSizeLimit = 512000000
 
 instance Yesod App where
-    maximumContentLength _thereIsOnly1AppHere (Just QuerycheckR) = Just useIncreasedSizeLimit
     maximumContentLength _thereIsOnly1AppHere (Just UploadkbR) = Just useIncreasedSizeLimit
     maximumContentLength _thereIsOnly1AppHere (Just ApiR) = Just useIncreasedSizeLimit
     maximumContentLength _thereIsOnly1AppHere _ = Nothing
@@ -68,13 +63,6 @@ getHealthcheckR = returnJson (Healthy True)
 logFactsInfo :: [ Kbgen.Fact ] -> Handler ()
 logFactsInfo facts = do
     $logInfo $ T.pack ("Num facts received: " ++ show (length facts))
-
-postQuerycheckR :: Handler Value
-postQuerycheckR = do
-    facts <- requireCheckJsonBody :: Handler [ Kbgen.Fact ]
-    logFactsInfo facts
-    results <- liftIO (queryEngine facts)
-    postQuerycheck' results
 
 postUploadkbR :: Handler Value
 postUploadkbR = do
@@ -100,27 +88,6 @@ requireKbFilename = do
     case kbFilename of
         Just path -> pure (T.unpack path)
         Nothing -> invalidArgs [ "missing query parameter: kb_location" ]
-
-newtype Timeout = Timeout Bool deriving ( Show, Eq )
-
-receivedTimeout :: QueryEngineResult -> Timeout
-receivedTimeout = Timeout . receivedTimeout'
-
-receivedTimeout' :: QueryEngineResult -> Bool
-receivedTimeout' result = null (Swipl.stdout result) && "timeout:" `List.isPrefixOf` Swipl.stderr result
-
-postQuerycheck' :: QueryEngineResult -> Handler Value
-postQuerycheck' results = postQuerycheck'' (receivedTimeout results) results
-
-postQuerycheck'' :: Timeout -> QueryEngineResult -> Handler Value
-postQuerycheck'' (Timeout True) _ = returnGatewayTimeout504
-postQuerycheck'' (Timeout False) results = returnJson results
-
-returnGatewayTimeout504 :: Handler Value
-returnGatewayTimeout504 = returnBodylessHttpStatusCode NetworkHTTPTypes.gatewayTimeout504
-
-returnBodylessHttpStatusCode :: NetworkHTTPTypes.Status -> Handler Value
-returnBodylessHttpStatusCode status = sendWaiResponse (Network.Wai.responseBuilder status [] mempty)
 
 main :: IO ()
 main = do
