@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
 
+# PR builds ( incl. predicates submodule bumps ) only build : every step that
+# touches a secret or publishes is guarded by `github.event_name == 'push'`.
+
 jobs:
 
   build:
@@ -19,6 +22,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: build docker image
       run: docker build --tag queryengine --file Dockerfile .
     - name: extract generated binary
@@ -32,8 +37,10 @@ jobs:
     - name: embed binary in minimal image
       run: docker build --tag queryengine.rel --file Dockerfile.rel .
     - name: login to DockerHub
+      if: github.event_name == 'push'
       run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
     - name: read and bump patch version
+      if: github.event_name == 'push'
       id: version
       run: |
         current=$(cat VERSION)
@@ -44,12 +51,16 @@ jobs:
         new_version="$major.$minor.$new_patch"
         echo "new_version=$new_version" >> $GITHUB_OUTPUT
     - name: tag release image
+      if: github.event_name == 'push'
       run: docker tag queryengine.rel ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-queryengine:${{ steps.version.outputs.new_version }}-x64
     - name: push image to Dockerhub
+      if: github.event_name == 'push'
       run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-queryengine:${{ steps.version.outputs.new_version }}-x64
     - name: update VERSION file
+      if: github.event_name == 'push'
       run: echo "${{ steps.version.outputs.new_version }}" > VERSION
     - name: commit version bump
+      if: github.event_name == 'push'
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@github.com"

@@ -213,4 +213,4 @@ utils_control_flow_callable_calls_callable(Wrapper, Handler) :-
 utils_control_flow_callable_calls_callable(Caller, Callee) :-
     callgraph_callable_calls_callable(Caller, Callee).
 
-:- [ 'api' ].
+:- [ 'predicates/api' ].

@@ -1,0 +1,3 @@
+[submodule "predicates"]
+	path = predicates
+	url = https://github.com/OrenGitHub/dhscanner.predicates.git
