@@ -35,6 +35,7 @@ executable queryengine
     other-modules:
         Api
         Swipl
+        KbWriter
         ApiEnv
         Logging
         -- Each API Query lives in a separate file
@@ -67,7 +68,9 @@ executable queryengine
         random,
         array,
         text,
-        mtl
+        mtl,
+        conduit,
+        json-stream
 
     ghc-options: -Wall -threaded -Werror=missing-fields -O2
 

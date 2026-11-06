@@ -3,13 +3,10 @@
 module Swipl
     ( Stdout(..)
     , Stderr(..)
-    , writeFactsToTempFile
     , runSwiplWithTimeout
     , saveAsMainFile
     ) where
 
-import Kbgen
-import Data.List as List
 import System.Timeout (timeout)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -20,24 +17,11 @@ import Control.Concurrent ( forkIO, threadDelay, killThread, ThreadId )
 import Control.Concurrent.MVar ( newEmptyMVar, putMVar, takeMVar )
 import Control.Exception ( finally, evaluate )
 import Control.Monad ( join )
-import System.IO ( Handle, openTempFile, hPutStr, hClose, hGetContents, hSetEncoding, utf8 )
+import System.IO ( Handle, openTempFile, hClose, hGetContents, hSetEncoding, utf8 )
 import qualified System.IO as IO
 
 newtype Stdout = Stdout String deriving ( Show, Eq )
 newtype Stderr = Stderr String deriving ( Show, Eq )
-
-writeFactsToTempFile :: [ Kbgen.Fact ] -> IO FilePath
-writeFactsToTempFile facts = do
-    tmpDir <- getTemporaryDirectory
-    (filename, handle) <- openTempFile tmpDir "kb_XXXXXXXX.pl"
-    writeFactsToFileHandle facts filename handle
-
-writeFactsToFileHandle :: [Kbgen.Fact] -> FilePath -> Handle -> IO FilePath
-writeFactsToFileHandle facts filename handle = do
-    hSetEncoding handle utf8
-    hPutStr handle (List.unlines (List.sort (List.map prologify facts)))
-    hClose handle
-    pure filename
 
 saveAsMainFile :: T.Text -> IO FilePath
 saveAsMainFile content = do
