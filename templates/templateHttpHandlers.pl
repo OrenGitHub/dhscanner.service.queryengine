@@ -113,12 +113,12 @@ user_inputs(Handler, Request, Inputs) :-
     !,
     findall(Input, ( kb_called_from(Call, Handler), servlet_input(Call, Input) ), Found),
     (   Found == [] -> Inputs = [ _{ kind: 'RequestObject', location: Request, name: null } ] ; Inputs = Found ).
-% rails : the action's `params` calls ( runner #152 ), or the action itself
-% when it reads none
+% rails : the `params` calls of the action and of the helpers it calls
+% ( runner #152, #154 ), or the action itself when it reads none
 user_inputs(Handler, Request, Inputs) :-
     endpoints_http_rails(Handler, _, _, _),
     !,
-    findall(_{ kind: 'RequestParam', location: Call, name: '' }, endpoints_user_input_of_method_rails(Handler, Call), Found),
+    findall(_{ kind: 'RequestParam', location: Call, name: '' }, endpoints_user_input_of_handler_rails(Handler, Call), Found),
     (   Found == [] -> Inputs = [ _{ kind: 'RequestObject', location: Request, name: null } ] ; Inputs = Found ).
 user_inputs(_, RequestObject, [ _{ kind: 'RequestObject', location: RequestObject, name: null } ]).
 
