@@ -15,6 +15,14 @@
 -- newlines after the sort. With `LC_ALL=C` the order is the byte order,
 -- which for utf-8 is the code point order of the former `List.sort` on
 -- `String`s : the kb is byte for byte the same as before.
+--
+-- `sort -u` drops identical facts. kbgen emits a class's facts ( its
+-- annotations, its 3rd party super, ... ) once per method of the class :
+-- 391 copies of each for a 391 method class. Each copy is one more answer
+-- in every join over it, so the joins blow up ( 29 x 29 rows for a single
+-- annotation ), e.g. `SelectControlFlowReachableSinks` past the swipl
+-- timeout ( runner, 2026-11-19 ). The fact count stays the number of
+-- facts received.
 module KbWriter
     ( writeFactsStreamToTempFile
     , factsFromJsonArray
@@ -81,7 +89,7 @@ sortRecords :: FilePath -> FilePath -> IO (Either String FilePath)
 sortRecords tmpDir unsortedPath = do
     (kbPath, kb) <- openTempFile tmpDir "kb_XXXXXXXX.pl"
     hClose kb
-    let script = "LC_ALL=C sort -z -S 1G -T \"$1\" --parallel=4 \"$2\" | tr '\\0' '\\n' > \"$3\""
+    let script = "LC_ALL=C sort -z -u -S 1G -T \"$1\" --parallel=4 \"$2\" | tr '\\0' '\\n' > \"$3\""
     (code, _, err) <- readCreateProcessWithExitCode
         (proc "/bin/bash" [ "-o", "pipefail", "-c", script, "sort", tmpDir, unsortedPath, kbPath ])
         { env = Just [ ("PATH", "/usr/bin:/bin") ] }
