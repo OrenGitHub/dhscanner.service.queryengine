@@ -21,6 +21,13 @@ import Yesod.Core
 import Kbapi ( Query )
 import Api ( queryApi )
 import ApiEnv ( ApiConfig(..), runApiEnv )
+import JsonTemplate ( QueryTimedOut(..) )
+import Swipl ( defaultTimeLimitSeconds )
+import Control.Exception ( try )
+import Network.HTTP.Types.Status ( gatewayTimeout504, notFound404 )
+import System.Directory ( doesFileExist, getTemporaryDirectory )
+import System.FilePath ( isAbsolute, (</>) )
+import Control.Monad ( unless )
 import Logging
 import KbWriter ( writeFactsStreamToTempFile )
 import GHC.Generics
@@ -77,11 +84,40 @@ postApiR :: Handler Value
 postApiR = do
     kbFilename <- requireKbFilename
     $logInfo $ T.pack ("API query request for kb: " ++ kbFilename)
+    requireExistingKb kbFilename
+    seconds <- requireTimeoutSeconds
     query <- requireCheckJsonBody :: Handler Query
-    let apiConfig = ApiConfig { apiEnvKbFilename = kbFilename }
-    result <- liftIO (runApiEnv apiConfig (queryApi query))
-    $logInfo "API query finished"
-    returnJson result
+    let apiConfig = ApiConfig { apiEnvKbFilename = kbFilename, apiEnvTimeoutSeconds = seconds }
+    result <- liftIO (try (runApiEnv apiConfig (queryApi query)))
+    case result of
+        Left (QueryTimedOut queryName limit) -> do
+            let msg = queryName ++ " timed out after " ++ show limit ++ " s ( no answer, NOT an empty answer )"
+            $logWarn (T.pack ("API query " ++ msg))
+            sendResponseStatus gatewayTimeout504 (object [ "error" .= msg ])
+        Right reply -> do
+            $logInfo "API query finished"
+            returnJson reply
+
+-- | A query on a kb that is not there is a 404, not an empty answer :
+-- swipl fails to load it, and the reply read "no path" ( HTTP 200 ). The
+-- templates live in the temp dir, so a relative kb name is relative to it.
+requireExistingKb :: String -> Handler ()
+requireExistingKb kb = do
+    tmpDir <- liftIO getTemporaryDirectory
+    let path = if isAbsolute kb then kb else tmpDir </> kb
+    found <- liftIO (or <$> mapM doesFileExist [ path, path ++ ".pl", path ++ ".qlf" ])
+    unless found (sendResponseStatus notFound404 (object [ "error" .= ("kb not found: " ++ kb) ]))
+
+-- | `?timeout_seconds=N` : the client's per-query bound ( 1 .. 600 ),
+-- 45 s when absent ( Swipl.defaultTimeLimitSeconds ).
+requireTimeoutSeconds :: Handler Word
+requireTimeoutSeconds = do
+    raw <- lookupGetParam "timeout_seconds"
+    case raw of
+        Nothing -> pure defaultTimeLimitSeconds
+        Just txt -> case reads (T.unpack txt) :: [ (Integer, String) ] of
+            [ (n, "") ] | n >= 1 && n <= 600 -> pure (fromIntegral n)
+            _ -> invalidArgs [ "timeout_seconds must be an integer in 1 .. 600, got: " <> txt ]
 
 requireKbFilename :: Handler String
 requireKbFilename = do

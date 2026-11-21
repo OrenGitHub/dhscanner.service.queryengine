@@ -8,6 +8,7 @@
 -- `Kbgen.restoreloc`.
 module JsonTemplate
     ( runJsonTemplate
+    , QueryTimedOut(..)
     , atomLocation
     , prologString
     , prologAtoms
@@ -15,8 +16,9 @@ module JsonTemplate
 
 import qualified Location
 import Kbgen (restoreloc)
-import ApiEnv (ApiEnv, asksKbFilename)
-import Swipl (saveAsMainFile, runSwiplWithTimeout, Stdout(..))
+import ApiEnv (ApiEnv, asksKbFilename, asksTimeoutSeconds)
+import Swipl (saveAsMainFile, runSwiplWithTimeout, Stdout(..), SwiplOutcome(..))
+import Control.Exception (Exception, throwIO)
 import Data.Aeson (FromJSON, decodeStrict)
 import Data.Maybe (listToMaybe, mapMaybe)
 import qualified Data.List as List
@@ -26,18 +28,34 @@ import qualified Data.Text.Encoding as TE
 import Control.Monad.IO.Class (liftIO)
 
 -- | Fill @{KNOWLEDGE_BASE}@ plus the given slots into the template, run
--- it, and decode the last JSON line it prints. 'Nothing' on a timeout,
--- a Prolog error ( non-zero exit ) or an undecodable reply.
+-- it, and decode the last JSON line it prints. 'Nothing' on a Prolog
+-- error ( non-zero exit ) or an undecodable reply. A timeout throws
+-- 'QueryTimedOut' : it must reach the client as an error ( a 504 ), never
+-- as an empty answer ( "no path", "0 sinks" ).
 runJsonTemplate :: FromJSON a => String -> FilePath -> [ (T.Text, String) ] -> ApiEnv (Maybe a)
 runJsonTemplate queryName templatePath slots = do
     kbFilename <- asksKbFilename
     liftIO (putStrLn ("[queryengine][api] " ++ queryName ++ " using kb: " ++ kbFilename))
     template <- liftIO (TIO.readFile templatePath)
-    let program = List.foldl' fillSlot template (("{KNOWLEDGE_BASE}", kbFilename) : slots)
+    let program = List.foldl' fillSlot template (("{KNOWLEDGE_BASE}", kbBareName kbFilename) : slots)
     path <- liftIO (saveAsMainFile program)
     liftIO (putStrLn ("[queryengine][api] SWI-Prolog main file path: " ++ path))
-    outputOrTimeout <- liftIO (runSwiplWithTimeout path)
-    pure (decodeOutput outputOrTimeout)
+    seconds <- asksTimeoutSeconds
+    outcome <- liftIO (runSwiplWithTimeout seconds path)
+    case outcome of
+        SwiplTimedOut -> liftIO (throwIO (QueryTimedOut queryName seconds))
+        SwiplFinished output -> pure (decodeOutput output)
+
+-- | The query's swipl run hit the per-query time limit ( seconds ).
+data QueryTimedOut = QueryTimedOut String Word deriving ( Show )
+
+instance Exception QueryTimedOut
+
+-- | The kb by its bare name : `[ '/tmp/kb_X' ]` loads `kb_X.qlf` when it
+-- is not older than `kb_X.pl`, `[ '/tmp/kb_X.pl' ]` always the slow `.pl`
+-- ( runner #246 ). Both spellings of the kb location are in use.
+kbBareName :: String -> String
+kbBareName kb = maybe kb reverse (List.stripPrefix (reverse ".pl") (reverse kb))
 
 fillSlot :: T.Text -> (T.Text, String) -> T.Text
 fillSlot template (slot, value) = T.replace slot (T.pack value) template

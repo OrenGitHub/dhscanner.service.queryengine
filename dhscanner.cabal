@@ -60,6 +60,7 @@ executable queryengine
         bytestring,
         wai-logger,
         directory,
+        filepath,
         wai-extra,
         warp,
         time,

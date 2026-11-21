@@ -39,6 +39,7 @@ import Control.Monad.IO.Class ( MonadIO, liftIO )
 import System.Directory ( getTemporaryDirectory, removeFile )
 import System.Exit ( ExitCode(..) )
 import System.IO ( openTempFile, hClose, hSetBinaryMode, hSetBuffering, BufferMode(..) )
+import qualified System.IO as IO
 import System.Process ( proc, readCreateProcessWithExitCode, CreateProcess(..) )
 
 -- | The elements of a json array, as facts. The result is `Left` with the
@@ -78,6 +79,7 @@ writeFactsStreamToTempFile body = do
         Right () -> liftIO $ do
             sorted <- sortRecords tmpDir unsortedPath
             removeFile unsortedPath
+            mapM_ qcompileKb sorted
             pure (fmap (\kbPath -> (kbPath, numFacts)) sorted)
     where
         writeRecord h n fact = do
@@ -99,3 +101,18 @@ sortRecords tmpDir unsortedPath = do
         ExitFailure c -> do
             removeFile kbPath
             pure (Left ("sort failed ( exit " ++ show c ++ " ) : " ++ err))
+
+-- | Compile the kb to `<name>.qlf` next to `<name>.pl` ( runner #246 ).
+-- Every query is a fresh swipl that loads the kb : 13.4 s for a 383 MB
+-- `.pl`, 0.6 s for its `.qlf` ( compiled once, ~18 s ). The templates
+-- load the kb by its bare name, and swipl then takes the `.qlf` when it
+-- is not older than the `.pl`. Not fatal : without a `.qlf` the queries
+-- load the `.pl`, as before.
+qcompileKb :: FilePath -> IO ()
+qcompileKb kbPath = do
+    (code, _, err) <- readCreateProcessWithExitCode
+        (proc "swipl" [ "--quiet", "-g", "current_prolog_flag(argv, Argv), last(Argv, Kb), qcompile(Kb)", "-t", "halt", "--", kbPath ])
+        ""
+    case code of
+        ExitSuccess -> IO.hPutStrLn IO.stderr ("[queryengine][kb] compiled " ++ kbPath ++ " to .qlf")
+        ExitFailure c -> IO.hPutStrLn IO.stderr ("[queryengine][kb] qcompile failed ( exit " ++ show c ++ " ), queries load the .pl : " ++ err)

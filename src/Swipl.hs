@@ -3,6 +3,8 @@
 module Swipl
     ( Stdout(..)
     , Stderr(..)
+    , SwiplOutcome(..)
+    , defaultTimeLimitSeconds
     , runSwiplWithTimeout
     , saveAsMainFile
     ) where
@@ -16,12 +18,19 @@ import System.Exit ( ExitCode(..) )
 import Control.Concurrent ( forkIO, threadDelay, killThread, ThreadId )
 import Control.Concurrent.MVar ( newEmptyMVar, putMVar, takeMVar )
 import Control.Exception ( finally, evaluate )
-import Control.Monad ( join )
 import System.IO ( Handle, openTempFile, hClose, hGetContents, hSetEncoding, utf8 )
 import qualified System.IO as IO
 
 newtype Stdout = Stdout String deriving ( Show, Eq )
 newtype Stderr = Stderr String deriving ( Show, Eq )
+
+-- | A run that hit the time limit is NOT a run without an answer : the
+-- caller must not read it as "no path" / "0 sinks" ( runner, 2026-11-21 :
+-- six 180 s timeouts read as "no flow" made a file upload handler `safe` ).
+data SwiplOutcome
+    = SwiplFinished (Maybe (Stdout, Stderr)) -- ^ 'Nothing' : non-zero exit
+    | SwiplTimedOut
+    deriving ( Show, Eq )
 
 saveAsMainFile :: T.Text -> IO FilePath
 saveAsMainFile content = do
@@ -37,13 +46,17 @@ writeMainFileHandle content path handle = do
     hClose handle
     pure path
 
--- 3 minutes timeout
-swiplTimeLimitSeconds :: Word
-swiplTimeLimitSeconds = 180
+-- | Per query, when the request names none ( `?timeout_seconds=` ).
+-- Measured on a 1.2k-file Java repo ( 589 queries ) : every dataflow path
+-- found took <= 1.7 s, the slow ones ( 10 .. 180 s ) were all "no path";
+-- the endpoints seed ~39 s alone, more than 45 s with 10 in parallel, so
+-- the client asks for more on that one.
+defaultTimeLimitSeconds :: Word
+defaultTimeLimitSeconds = 45
 
 -- convert to signed + microseconds for actual OS execution
-swiplTimeLimitMicroseconds :: Int
-swiplTimeLimitMicroseconds = fromIntegral (swiplTimeLimitSeconds * 1000000)
+toMicroseconds :: Word -> Int
+toMicroseconds seconds = fromIntegral (seconds * 1000000)
 
 swiplArgs :: FilePath -> [ String ]
 swiplArgs path = ["--quiet", "-s", path, "-g", "main", "-t", "halt"]
@@ -63,8 +76,8 @@ createSwiplProcess path = do
 killSwiplProcess :: ProcessHandle -> IO ()
 killSwiplProcess ph = do { terminateProcess ph; threadDelay 1000000; terminateProcess ph }
 
-setupTimeoutKiller :: ProcessHandle -> IO ThreadId
-setupTimeoutKiller ph = forkIO (do { threadDelay swiplTimeLimitMicroseconds; killSwiplProcess ph })
+setupTimeoutKiller :: Word -> ProcessHandle -> IO ThreadId
+setupTimeoutKiller seconds ph = forkIO (do { threadDelay (toMicroseconds seconds); killSwiplProcess ph })
 
 readProcessOutput' :: ExitCode -> String -> String -> Maybe (Stdout, Stderr)
 readProcessOutput' ExitSuccess out err = Just (Stdout out, Stderr err)
@@ -89,16 +102,17 @@ drain h = do
     content <- hGetContents h
     evaluate (length content `seq` content)
 
-runProcessWithTimeout :: Handle -> Handle -> ProcessHandle -> IO (Maybe (Stdout, Stderr))
-runProcessWithTimeout hOut hErr ph = do
-    timeoutThread <- setupTimeoutKiller ph
+runProcessWithTimeout :: Word -> Handle -> Handle -> ProcessHandle -> IO SwiplOutcome
+runProcessWithTimeout seconds hOut hErr ph = do
+    timeoutThread <- setupTimeoutKiller seconds ph
     let processAction = readProcessOutput hOut hErr ph
-    mResult <- timeout swiplTimeLimitMicroseconds processAction `finally` killThread timeoutThread
-    pure (join mResult)
+    mResult <- timeout (toMicroseconds seconds) processAction `finally` killThread timeoutThread
+    pure (maybe SwiplTimedOut SwiplFinished mResult)
 
-runSwiplWithTimeout' :: Maybe (Handle, Handle, ProcessHandle) -> IO (Maybe (Stdout, Stderr))
-runSwiplWithTimeout' (Just (hOut, hErr, ph)) = runProcessWithTimeout hOut hErr ph
-runSwiplWithTimeout' _ = pure Nothing
+runSwiplWithTimeout' :: Word -> Maybe (Handle, Handle, ProcessHandle) -> IO SwiplOutcome
+runSwiplWithTimeout' seconds (Just (hOut, hErr, ph)) = runProcessWithTimeout seconds hOut hErr ph
+runSwiplWithTimeout' _ _ = pure (SwiplFinished Nothing)
 
-runSwiplWithTimeout :: FilePath -> IO (Maybe (Stdout, Stderr))
-runSwiplWithTimeout path = createSwiplProcess path >>= runSwiplWithTimeout'
+-- | Run the main file, killed after the given number of seconds.
+runSwiplWithTimeout :: Word -> FilePath -> IO SwiplOutcome
+runSwiplWithTimeout seconds path = createSwiplProcess path >>= runSwiplWithTimeout' seconds
