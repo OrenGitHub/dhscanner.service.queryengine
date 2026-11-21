@@ -98,6 +98,19 @@ def(Handler, _{ kind: 'NamedFunction', name: Name, className: null }) :-
     !.
 def(_, _{ kind: 'AnonymousFunction', name: null, className: null }).
 
+% asp.net core : every action param the model binder fills, its kind
+% from the binding source attribute ( predicates endpoints/csharp ) ;
+% before spring, whose branch takes any annotated handler
+user_inputs(Handler, _, Inputs) :-
+    endpoints_http_aspnet(Handler, _, _, _),
+    !,
+    findall(Index-_{ kind: Kind, location: Param, name: Name },
+            ( kb_param_i_of_callable(Param, Index, Handler),
+              endpoints_user_input_kind_aspnet(Param, Kind),
+              param_name(Param, Name) ),
+            Pairs),
+    keysort(Pairs, Sorted),
+    pairs_values(Sorted, Inputs).
 % spring : user input arrives through annotated params ; the
 % request-object slot holds the routing annotation
 user_inputs(Handler, Mapping, Inputs) :-
