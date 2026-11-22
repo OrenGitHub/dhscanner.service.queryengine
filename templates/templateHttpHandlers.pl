@@ -111,6 +111,19 @@ user_inputs(Handler, _, Inputs) :-
             Pairs),
     keysort(Pairs, Sorted),
     pairs_values(Sorted, Inputs).
+% laravel : every param of the route handler, a `{..}` url segment's
+% one is a PathVariable, the others the RequestObject ( predicates
+% endpoints/php )
+user_inputs(Handler, _, Inputs) :-
+    endpoints_http_laravel(Handler, _, _, _),
+    !,
+    findall(Index-_{ kind: Kind, location: Param, name: Name },
+            ( kb_param_i_of_callable(Param, Index, Handler),
+              endpoints_user_input_kind_laravel(Param, Kind),
+              param_name(Param, Name) ),
+            Pairs),
+    keysort(Pairs, Sorted),
+    pairs_values(Sorted, Inputs).
 % spring : user input arrives through annotated params ; the
 % request-object slot holds the routing annotation
 user_inputs(Handler, Mapping, Inputs) :-
