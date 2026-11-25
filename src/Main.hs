@@ -32,7 +32,7 @@ import Logging
 import KbWriter ( writeFactsStreamToTempFile )
 import GHC.Generics
 import qualified Data.Text as T
-import Network.Wai.Handler.Warp (run)
+import Network.Wai.Handler.Warp ( runSettings, setPort, setTimeout, defaultSettings )
 import Data.Word ( Word64 )
 
 newtype Healthy = Healthy Bool deriving ( Generic )
@@ -129,4 +129,6 @@ requireKbFilename = do
 main :: IO ()
 main = do
     waiApp <- toWaiAppPlain App
-    run 3000 $ defaultMiddlewaresNoLogging waiApp
+    -- 60 s : /uploadkb sorts and qlf compiles the kb without I/O, 35 s for
+    -- Discourse ( Warp's default 30 s closed the connection mid compile )
+    runSettings (setPort 3000 (setTimeout 60 defaultSettings)) $ defaultMiddlewaresNoLogging waiApp
