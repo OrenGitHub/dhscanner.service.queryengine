@@ -1,4 +1,4 @@
-# predicates/ is the dhscanner.predicates submodule : only its root api.pl and six
+# predicates/ is the dhscanner.predicates submodule : only its root api.pl and seven
 # catalog families belong in the image ( not its tests/, CI, docs, .git ).
 predicates/*
 !predicates/api.pl
@@ -8,3 +8,4 @@ predicates/*
 !predicates/endpoints
 !predicates/sanitizers
 !predicates/sinks
+!predicates/utils

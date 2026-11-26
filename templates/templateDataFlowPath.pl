@@ -15,7 +15,9 @@
 %   {LIMIT_LENGTH}     - max intra-procedural path length, in edges
 %   {ALLOW_INTER_PROCEDURAL} - `true` to fall back to the inter-procedural hop, else `fail`
 %
-% Output : one JSON list of location atoms ( From first, To last ), or
+% Output : { path } with path the JSON list of location atoms ( From first,
+% To last ), plus { model, column } when To writes to a db and the path
+% goes through the value it stores ( sinks_db_write_column/4 ), or
 % `null` when there is no path.
 % ------------------------------------------------------------------
 
@@ -28,6 +30,7 @@
 :- dynamic kb_arg_i_for_call/3.
 :- dynamic kb_param_i_of_callable/3.
 :- dynamic kb_const_string/2.
+:- dynamic kb_class_def/3.
 
 :- [ '{KNOWLEDGE_BASE}' ].
 :- [ 'predicates/api' ].
@@ -39,10 +42,22 @@ main :-
     MaxLength = {LIMIT_LENGTH},
     (   path(From, To, MaxLength, Edges)
     ->  findall(Node, member((_, Node), Edges), Rest),
-        json_write(current_output, [From|Rest], [width(0)])
+        Path = [From|Rest],
+        (   db_write_on_path(To, Path, Model, Column)
+        ->  json_write_dict(current_output, _{ path: Path, model: Model, column: Column }, [width(0)])
+        ;   json_write_dict(current_output, _{ path: Path }, [width(0)])
+        )
     ;   json_write(current_output, null)
     ),
     nl.
+
+% `To` writes to a db and the path goes through the value it stores in
+% `Column` of the 1st party model named `Model`
+db_write_on_path(To, Path, Model, Column) :-
+    sinks_db_write_column(To, ModelClass, Column, Value),
+    memberchk(Value, Path),
+    kb_class_def(ModelClass, Model, _),
+    !.
 
 path(From, To, MaxLength, Edges) :-
     between(1, MaxLength, N),

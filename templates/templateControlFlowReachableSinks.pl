@@ -71,3 +71,4 @@ sink_kind(Call, _, 'SSRF') :- sinks_ssrf(Call).
 sink_kind(Call, _, 'SSRF') :- sinks_http_request(Call).
 sink_kind(_, Fqn, 'SQL') :- sub_atom(Fqn, _, _, _, '.prisma.').
 sink_kind(Call, _, 'SQL') :- sinks_sqli(Call).
+sink_kind(Call, _, 'DbWrite') :- sinks_db_write(Call).
