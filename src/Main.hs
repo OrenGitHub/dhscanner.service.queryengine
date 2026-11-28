@@ -21,10 +21,11 @@ import Yesod.Core
 import Kbapi ( Query )
 import Api ( queryApi )
 import ApiEnv ( ApiConfig(..), runApiEnv )
-import JsonTemplate ( QueryTimedOut(..) )
+import JsonTemplate ( QueryTimedOut(..), QueryFailed(..), FailureKind(..) )
+import QueryError
 import Swipl ( defaultTimeLimitSeconds )
 import Control.Exception ( try )
-import Network.HTTP.Types.Status ( gatewayTimeout504, notFound404 )
+import Network.HTTP.Types.Status ( Status )
 import System.Directory ( doesFileExist, getTemporaryDirectory )
 import System.FilePath ( isAbsolute, (</>) )
 import Control.Monad ( unless )
@@ -88,13 +89,17 @@ postApiR = do
     seconds <- requireTimeoutSeconds
     query <- requireCheckJsonBody :: Handler Query
     let apiConfig = ApiConfig { apiEnvKbFilename = kbFilename, apiEnvTimeoutSeconds = seconds }
-    result <- liftIO (try (runApiEnv apiConfig (queryApi query)))
+    result <- liftIO (try (try (runApiEnv apiConfig (queryApi query))))
     case result of
         Left (QueryTimedOut queryName limit) -> do
             let msg = queryName ++ " timed out after " ++ show limit ++ " s ( no answer, NOT an empty answer )"
             $logWarn (T.pack ("API query " ++ msg))
-            sendResponseStatus gatewayTimeout504 (object [ "error" .= msg ])
-        Right reply -> do
+            sendQueryError (Timeout (TimeoutContent msg))
+        Right (Left (QueryFailed queryName kind detail)) -> do
+            let msg = queryName ++ " failed ( " ++ show kind ++ " ) : no answer, NOT an empty answer\n" ++ detail
+            $logError (T.pack ("API query " ++ msg))
+            sendQueryError (queryErrorOf kind msg)
+        Right (Right reply) -> do
             $logInfo "API query finished"
             returnJson reply
 
@@ -106,7 +111,21 @@ requireExistingKb kb = do
     tmpDir <- liftIO getTemporaryDirectory
     let path = if isAbsolute kb then kb else tmpDir </> kb
     found <- liftIO (or <$> mapM doesFileExist [ path, path ++ ".pl", path ++ ".qlf" ])
-    unless found (sendResponseStatus notFound404 (object [ "error" .= ("kb not found: " ++ kb) ]))
+    unless found (sendQueryError (KBNotFound (KBNotFoundContent ("kb not found: " ++ kb))))
+
+-- | A failed query as a kbapi 'QueryError', with its own HTTP status.
+sendQueryError :: QueryError -> Handler a
+sendQueryError err = sendResponseStatus (toEnum (fromIntegral (httpResponseCodeOf err)) :: Status) (toJSON err)
+
+-- | One clause per 'FailureKind', no wildcard : a new kind without a
+-- 'QueryError' is a compile error.
+queryErrorOf :: FailureKind -> String -> QueryError
+queryErrorOf PrologFailed msg = BackendInfraProblems (BackendInfraProblemsContent msg)
+queryErrorOf PrologException msg = BackendInfraProblems (BackendInfraProblemsContent msg)
+queryErrorOf (PrologExited _) msg = BackendInfraProblems (BackendInfraProblemsContent msg)
+queryErrorOf PrologNotStarted msg = KBSearchToolNotFound (KBSearchToolNotFoundContent msg)
+queryErrorOf UndecodableReply msg = KBResponseInvalidSyntax (KBResponseInvalidSyntaxContent msg)
+queryErrorOf UnreadableKbAtom msg = KBResponseInvalidSyntax (KBResponseInvalidSyntaxContent msg)
 
 -- | `?timeout_seconds=N` : the client's per-query bound ( 1 .. 600 ),
 -- 45 s when absent ( Swipl.defaultTimeLimitSeconds ).

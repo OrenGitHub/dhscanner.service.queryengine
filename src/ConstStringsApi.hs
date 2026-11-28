@@ -9,11 +9,10 @@ module ConstStringsApi
 import Kbapi (QueryResult(..))
 import qualified WithConstStrings as Q
 import ApiEnv (ApiEnv)
-import JsonTemplate (runJsonTemplate, atomLocation, prologString)
+import JsonTemplate (runJsonTemplate, atomLocation, prologString, requireAll)
 import Data.Aeson (FromJSON(..), withObject, (.:))
-import Data.Maybe (fromMaybe, mapMaybe)
 
-data Match = Match String String
+data Match = Match String String deriving ( Show )
 
 instance FromJSON Match where
     parseJSON = withObject "Match" (\o -> Match <$> o .: "location" <*> o .: "value")
@@ -24,7 +23,7 @@ query features = do
         [ ("{REGEX}", prologString (Q.matchingRegex features))
         , ("{LIMIT}", show (Q.maxNumConstStrings features))
         ]
-    let matches = mapMaybe buildMatch (fromMaybe [] reply)
+    matches <- requireAll "ConstStrings" buildMatch reply
     pure (FoundConstStringsMatching Q.Content
         { Q.total = fromIntegral (length matches)
         , Q.matches = matches

@@ -47,7 +47,7 @@ main :-
         ->  json_write_dict(current_output, _{ path: Path, model: Model, column: Column }, [width(0)])
         ;   json_write_dict(current_output, _{ path: Path }, [width(0)])
         )
-    ;   json_write(current_output, null)
+    ;   json_write_dict(current_output, null, [width(0)])
     ),
     nl.
 

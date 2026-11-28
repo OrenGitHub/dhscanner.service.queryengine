@@ -12,12 +12,11 @@ import Kbapi (QueryResult(..))
 import Kbgen (locationify)
 import qualified WithControlFlowReachableSinks as Q
 import ApiEnv (ApiEnv)
-import JsonTemplate (runJsonTemplate, atomLocation, prologAtoms)
+import JsonTemplate (runJsonTemplate, atomLocation, prologAtoms, requireAll)
 import Data.Aeson (FromJSON(..), withObject, (.:))
-import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 
-data Match = Match String String Q.Sink
+data Match = Match String String Q.Sink deriving ( Show )
 
 instance FromJSON Match where
     parseJSON = withObject "Match" (\o -> Match <$> o .: "location" <*> o .: "qualifiedName" <*> o .: "kind")
@@ -30,7 +29,7 @@ query features = do
         , ("{SINKS}", prologAtoms (map show (Set.toList (Q.sinks features))))
         , ("{LIMIT}", show (Q.maxNumSinks features))
         ]
-    let matches = mapMaybe buildMatch (fromMaybe [] reply)
+    matches <- requireAll "ControlFlowReachableSinks" buildMatch reply
     pure (FoundControlFlowReachableSinks Q.Content
         { Q.total = fromIntegral (length matches)
         , Q.matches = matches

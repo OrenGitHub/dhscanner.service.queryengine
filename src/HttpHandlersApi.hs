@@ -11,24 +11,24 @@ import Kbapi (QueryResult(..))
 import Location (Location)
 import qualified WithHttpHandlers as Q
 import ApiEnv (ApiEnv)
-import JsonTemplate (runJsonTemplate, atomLocation, prologString, prologAtoms)
+import JsonTemplate (runJsonTemplate, atomLocation, prologString, prologAtoms, requireAll)
 import Data.Aeson (FromJSON(..), withObject, (.:), (.:?))
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe)
 import Control.Monad (replicateM)
 import Control.Monad.IO.Class (liftIO)
 import System.Random (randomIO)
 import qualified Data.List as List
 import qualified Data.Set as Set
 
-data Handler = Handler String String String Def [ Input ] (Maybe Auth)
+data Handler = Handler String String String Def [ Input ] (Maybe Auth) deriving ( Show )
 
-data Def = Def String (Maybe String) (Maybe String)
+data Def = Def String (Maybe String) (Maybe String) deriving ( Show )
 
-data Input = Input String String (Maybe String)
+data Input = Input String String (Maybe String) deriving ( Show )
 
-data Auth = Auth String String (Maybe String) (Maybe [ Annotation ])
+data Auth = Auth String String (Maybe String) (Maybe [ Annotation ]) deriving ( Show )
 
-data Annotation = Annotation String String [ String ]
+data Annotation = Annotation String String [ String ] deriving ( Show )
 
 instance FromJSON Handler where
     parseJSON = withObject "Handler" (\o -> Handler
@@ -62,7 +62,7 @@ query features = do
         , ("{AUTHENTICATIONS}", prologAtoms (map authAtom (Set.toList (Q.authentications features))))
         , ("{URL_PARTS}", maybe "none" urlParts (Q.routeContainsUrlParts features))
         ]
-    let matches = mapMaybe buildHandler (fromMaybe [] reply)
+    matches <- requireAll "HttpHandlers" buildHandler reply
     ordered <- liftIO (order (Q.orderEndpointsLexicographically features) matches)
     pure (FoundHttpHandlers Q.Content
         { Q.total = fromIntegral (length matches)
@@ -110,12 +110,13 @@ buildHandler (Handler atom verb url def inputs auth) = do
     verb' <- buildVerb verb
     def' <- buildDef def
     auth' <- traverse buildAuth auth
+    inputs' <- traverse buildInput inputs
     pure Q.HttpHandler
         { Q.httpHandlerVerb = verb'
         , Q.httpHandlerLocation = loc
         , Q.httpHandlerDef = def'
         , Q.httpHandlerUrl = url
-        , Q.httpHandlerUserInputs = mapMaybe buildInput inputs
+        , Q.httpHandlerUserInputs = inputs'
         , Q.httpHandlerAuth = auth'
         }
 

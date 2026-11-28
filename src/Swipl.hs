@@ -27,8 +27,16 @@ newtype Stderr = Stderr String deriving ( Show, Eq )
 -- | A run that hit the time limit is NOT a run without an answer : the
 -- caller must not read it as "no path" / "0 sinks" ( runner, 2026-11-21 :
 -- six 180 s timeouts read as "no flow" made a file upload handler `safe` ).
+--
+-- Neither is a non-zero exit : swipl exits 1 when `main` fails or ( with
+-- `--on-error=status` ) when an error was printed while loading the kb,
+-- the catalogs or the template, and 2 on an uncaught exception ( an
+-- unknown procedure, a stack limit ). Without the flag a load error exits
+-- 0 and `main` answers from what did load : a partial catalog.
 data SwiplOutcome
-    = SwiplFinished (Maybe (Stdout, Stderr)) -- ^ 'Nothing' : non-zero exit
+    = SwiplFinished Stdout Stderr
+    | SwiplExited Int Stderr
+    | SwiplNotStarted
     | SwiplTimedOut
     deriving ( Show, Eq )
 
@@ -59,7 +67,7 @@ toMicroseconds :: Word -> Int
 toMicroseconds seconds = fromIntegral (seconds * 1000000)
 
 swiplArgs :: FilePath -> [ String ]
-swiplArgs path = ["--quiet", "-s", path, "-g", "main", "-t", "halt"]
+swiplArgs path = ["--quiet", "--on-error=status", "-s", path, "-g", "main", "-t", "halt"]
 
 swiplProcessConfig :: FilePath -> CreateProcess
 swiplProcessConfig path = (proc "swipl" (swiplArgs path)) {
@@ -79,16 +87,16 @@ killSwiplProcess ph = do { terminateProcess ph; threadDelay 1000000; terminatePr
 setupTimeoutKiller :: Word -> ProcessHandle -> IO ThreadId
 setupTimeoutKiller seconds ph = forkIO (do { threadDelay (toMicroseconds seconds); killSwiplProcess ph })
 
-readProcessOutput' :: ExitCode -> String -> String -> Maybe (Stdout, Stderr)
-readProcessOutput' ExitSuccess out err = Just (Stdout out, Stderr err)
-readProcessOutput' _ _ _ = Nothing
+readProcessOutput' :: ExitCode -> String -> String -> SwiplOutcome
+readProcessOutput' ExitSuccess out err = SwiplFinished (Stdout out) (Stderr err)
+readProcessOutput' (ExitFailure code) _ err = SwiplExited code (Stderr err)
 
 -- | drain both pipes /before/ waiting for swipl : an output larger than
 -- the pipe buffer ( ~64KB, eg every handler of a big repo ) otherwise
 -- blocks swipl on its write while we block on its exit, until the
 -- timeout kills it. stderr drains on its own thread so neither pipe
 -- can fill up while the other one is read.
-readProcessOutput :: Handle -> Handle -> ProcessHandle -> IO (Maybe (Stdout, Stderr))
+readProcessOutput :: Handle -> Handle -> ProcessHandle -> IO SwiplOutcome
 readProcessOutput hOut hErr ph = do
     errVar <- newEmptyMVar
     _ <- forkIO (drain hErr >>= putMVar errVar)
@@ -107,11 +115,11 @@ runProcessWithTimeout seconds hOut hErr ph = do
     timeoutThread <- setupTimeoutKiller seconds ph
     let processAction = readProcessOutput hOut hErr ph
     mResult <- timeout (toMicroseconds seconds) processAction `finally` killThread timeoutThread
-    pure (maybe SwiplTimedOut SwiplFinished mResult)
+    pure (maybe SwiplTimedOut id mResult)
 
 runSwiplWithTimeout' :: Word -> Maybe (Handle, Handle, ProcessHandle) -> IO SwiplOutcome
 runSwiplWithTimeout' seconds (Just (hOut, hErr, ph)) = runProcessWithTimeout seconds hOut hErr ph
-runSwiplWithTimeout' _ _ = pure (SwiplFinished Nothing)
+runSwiplWithTimeout' _ _ = pure SwiplNotStarted
 
 -- | Run the main file, killed after the given number of seconds.
 runSwiplWithTimeout :: Word -> FilePath -> IO SwiplOutcome

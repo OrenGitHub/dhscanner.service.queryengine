@@ -44,6 +44,7 @@ executable queryengine
         ConstStringsApi
         DataFlowPathApi
         SanitizersApi
+        DBReadsApi
         JsonTemplate
 
     build-depends:
@@ -52,8 +53,8 @@ executable queryengine
         containers,
         dhscanner-ast >= 1.6.0,
         dhscanner-bitcode >= 2.5.0,
-        dhscanner-kbgen >= 2.9.0,
-        dhscanner-kbapi >= 2.0.0,
+        dhscanner-kbgen >= 2.10.0,
+        dhscanner-kbapi >= 3.1.0,
         yesod-core,
         http-types,
         fast-logger,
@@ -73,6 +74,6 @@ executable queryengine
         conduit,
         json-stream
 
-    ghc-options: -Wall -threaded -Werror=missing-fields -O2
+    ghc-options: -Wall -threaded -Werror=missing-fields -Werror=incomplete-patterns -O2
 
     default-language: GHC2024

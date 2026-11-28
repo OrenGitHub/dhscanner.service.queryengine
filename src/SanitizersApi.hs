@@ -12,16 +12,15 @@ import Kbapi (QueryResult(..))
 import Kbgen (locationify)
 import qualified WithSanitizers as Q
 import ApiEnv (ApiEnv)
-import JsonTemplate (runJsonTemplate, atomLocation)
+import JsonTemplate (runJsonTemplate, atomLocation, requireAll)
 import Data.Aeson (FromJSON(..), withObject, (.:), (.:?))
-import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.List as List
 
-data Gadget = Gadget Call Word [ Step ] [ Call ] [ Call ]
+data Gadget = Gadget Call Word [ Step ] [ Call ] [ Call ] deriving ( Show )
 
-data Step = Step String (Maybe String)
+data Step = Step String (Maybe String) deriving ( Show )
 
-data Call = Call String (Maybe String) [ String ]
+data Call = Call String (Maybe String) [ String ] deriving ( Show )
 
 instance FromJSON Gadget where
     parseJSON = withObject "Gadget" (\o -> Gadget
@@ -44,7 +43,7 @@ query features = do
         , ("{USER_INPUT_ATOM}", locationify (Q.userInput features))
         , ("{LIMIT}", show (Q.maxNumSanitizers features))
         ]
-    let matches = mapMaybe buildGadget (fromMaybe [] reply)
+    matches <- requireAll "Sanitizers" buildGadget reply
     pure (FoundSanitizers Q.Content
         { Q.total = fromIntegral (length matches)
         , Q.matches = matches
@@ -54,16 +53,18 @@ buildGadget :: Gadget -> Maybe Q.Sanitizer
 buildGadget (Gadget cond argIndex steps thenPart elsePart) = do
     cond' <- buildCall cond
     flow <- traverse buildStep steps
+    thenPart' <- buildPart thenPart
+    elsePart' <- buildPart elsePart
     pure (Q.TopLevelIfThenElse Q.IfThenElse
         { Q.cond = cond'
         , Q.userInputArgIndex = argIndex
         , Q.userInputFlow = flow
-        , Q.thenPart = buildPart thenPart
-        , Q.elsePart = buildPart elsePart
+        , Q.thenPart = thenPart'
+        , Q.elsePart = elsePart'
         })
 
-buildPart :: [ Call ] -> [ Q.PartCall ]
-buildPart = List.sortOn Q.location . mapMaybe buildCall
+buildPart :: [ Call ] -> Maybe [ Q.PartCall ]
+buildPart calls = List.sortOn Q.location <$> traverse buildCall calls
 
 buildStep :: Step -> Maybe Q.FlowStep
 buildStep (Step atom fqn) = do
